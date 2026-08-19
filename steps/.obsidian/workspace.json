@@ -1,0 +1,222 @@
+{
+  "main": {
+    "id": "fe2efbbd3ff7e4f3",
+    "type": "split",
+    "children": [
+      {
+        "id": "fe13f7fe62a35c09",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "5424c0658b1bd848",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "9af506a49081aee1",
+    "type": "split",
+    "children": [
+      {
+        "id": "e2863c5508480c51",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "a7f837717b2687b8",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "4b5bb0162ace14ef",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "f73ffc832da1ad92",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "aa9e6029841d11db",
+    "type": "split",
+    "children": [
+      {
+        "id": "ac68c00a83c7a047",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "de5d4f4b40b02274",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "cd9ccbfcff555be5",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "6a0b6175d42eeddf",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "f6aa73e68409b6c7",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "193ce0727a3f6f49",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "a7f837717b2687b8",
+  "lastOpenFiles": [
+    "Capstone - You Built an OS.md",
+    "Phase 8 - The Shell/Stage 8.4 - init - Wiring It Together.md",
+    "Phase 8 - The Shell/Stage 8.3 - Launching Programs.md",
+    "Phase 8 - The Shell/Stage 8.2 - Built-in Commands.md",
+    "Phase 8 - The Shell/Stage 8.1 - The Shell Read-Eval Loop.md",
+    "Phase 8 - The Shell/Phase 8 - Overview.md",
+    "Phase 8 - The Shell",
+    "Phase 7 - Filesystem & Program Loading/Stage 7.4 - Loading and Running an ELF Program.md",
+    "Phase 7 - Filesystem & Program Loading/Stage 7.3 - The Virtual Filesystem Layer.md",
+    "Phase 7 - Filesystem & Program Loading/Stage 7.2 - A Read-Only Filesystem.md",
+    "Phase 7 - Filesystem & Program Loading/Stage 7.1 - The Initial Ramdisk.md",
+    "Phase 7 - Filesystem & Program Loading/Phase 7 - Overview.md",
+    "Phase 7 - Filesystem & Program Loading",
+    "Phase 6 - User Mode & System Calls/Stage 6.4 - A Minimal User C Library.md",
+    "Phase 6 - User Mode & System Calls/Stage 6.3 - The System Call Interface.md",
+    "Phase 6 - User Mode & System Calls/Stage 6.2 - Entering Ring 3.md",
+    "Phase 6 - User Mode & System Calls/Stage 6.1 - The Task State Segment.md",
+    "Phase 6 - User Mode & System Calls/Phase 6 - Overview.md",
+    "Phase 6 - User Mode & System Calls",
+    "Phase 5 - Multitasking/Stage 5.4 - Sleep and Blocking.md",
+    "Phase 5 - Multitasking/Stage 5.3 - Preemptive Scheduling.md",
+    "Phase 5 - Multitasking/Stage 5.2 - Cooperative Task Switching.md",
+    "Phase 5 - Multitasking/Stage 5.1 - Tasks, Context, and the Stack.md",
+    "Phase 4 - Memory Management/Stage 4.4 - The Kernel Heap.md",
+    "Phase 5 - Multitasking/Phase 5 - Overview.md",
+    "Phase 5 - Multitasking",
+    "Phase 4 - Memory Management/Stage 4.3 - Enabling Paging.md",
+    "Phase 4 - Memory Management/Stage 4.2 - The Physical Frame Allocator.md",
+    "Phase 4 - Memory Management/Stage 4.1 - Reading the Memory Map.md",
+    "Phase 4 - Memory Management/Phase 4 - Overview.md",
+    "Phase 4 - Memory Management",
+    "Phase 3 - Drivers Timer & Keyboard",
+    "Phase 2 - CPU Tables & Interrupts",
+    "Phase 1 - Text Output",
+    "Phase 0 - Toolchain & First Boot"
+  ]
+}
