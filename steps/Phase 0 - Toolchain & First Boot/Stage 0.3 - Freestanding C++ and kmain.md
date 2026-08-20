@@ -76,7 +76,7 @@ copied, and the ranges are reserved in Phase 4 so the allocator never hands them
 
 Limine gives you a valid stack, so unlike the 32-bit path you do **not** need to set
 one up before calling C++. You will define your own kernel stack with a **guard page**
-in Stage 0.6, once the linker script exists.
+in Stage 0.4, once the linker script exists.
 
 ---
 
@@ -91,7 +91,7 @@ in Stage 0.6, once the linker script exists.
    - copies the memory map entries into the array,
    - returns a pointer to it.
 3. Make the failure path loud: if a required response is null, halt with a distinct
-   pattern. You cannot print yet — Stage 0.4 fixes that — so for now write a
+   pattern. You cannot print yet — Stage 0.6 fixes that — so for now write a
    recognisable value to a register and `hlt`, and note which check failed.
 4. In `kmain`, call `collect_boot_info()`, then `kernel_init(info)`.
 5. Create `kernel/main.cpp` with `void kernel_init(BootInfo*)`, empty for now. **This
@@ -107,7 +107,7 @@ in Stage 0.6, once the linker script exists.
 - `grep -rn "limine" kernel/ --include='*.cpp' | grep -v arch/x86_64/boot/` returns
   nothing. This is the CI rule; check it locally now.
 - `x86_64-elf-nm kernel/main.o` shows `kernel_init` defined and no Limine symbols.
-- The full boot test is at the end of Stage 0.7.
+- The full boot test is at the end of Stage 0.5.
 
 ---
 
@@ -140,4 +140,4 @@ in Stage 0.6, once the linker script exists.
 - [[ADR-0007 - Freestanding C++20 as the Kernel Language]]
 - [[06 - Architecture Overview]] — the initialisation order this feeds into
 
-Next: **Stage 0.4 - Serial Output First**
+Next: **Stage 0.4 - The Linker Script and Higher-Half Layout**

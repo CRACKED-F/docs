@@ -1,4 +1,4 @@
-# Stage 0.5 — Panic and `KASSERT`
+# Stage 0.7 — Panic and `KASSERT`
 
 **Difficulty:** Medium · ~45 minutes
 **Phase:** [[Phase 0 - Overview|Phase 0 — Toolchain & First Boot]]
@@ -87,7 +87,7 @@ CI timeout instead of the message that explained everything.
 
 ## How to verify
 
-From Stage 0.7 onward, `make run-serial` with a deliberate panic should produce
+From Stage 0.5 onward, `make run-serial` with a deliberate panic should produce
 something like:
 
 ```
@@ -141,4 +141,4 @@ Checks:
 - [[14 - Debugging Playbook]] — the panic format is specified there
 - [[13 - Coding Standards]] rule 7 — assert versus return
 
-Next: **Stage 0.6 - The Linker Script and Higher-Half Layout**
+Next: **Stage 0.8 - The Build System**
