@@ -61,7 +61,7 @@ up.
   in **[[Phase 1 - Overview|Phase 1]]** for exactly this reason.
 - **Use the QEMU monitor.** `Ctrl-Alt-2` in QEMU opens a monitor where you can dump
   registers (`info registers`) and memory. See
-  **[[03 - Resources & Reading#Debugging]]**.
+  **[[03 - Resources and Reading#Debugging]]**.
 - **Attach GDB to QEMU.** QEMU can pause and wait for a debugger with `-s -S`. This
   turns "blank screen" into a single-stepped instruction trace. This is the single
   most valuable skill in this whole guide.
@@ -86,7 +86,7 @@ up.
 1. Re-read the stage **Concept** and **Common traps**.
 2. Read the linked wiki page in full, not just the snippet.
 3. Compare your code against a reference implementation (see
-   **[[03 - Resources & Reading#Reference implementations]]**). Reading working
+   **[[03 - Resources and Reading#Reference implementations]]**). Reading working
    code is not cheating; it is how everyone learns this.
 4. Ask with a specific question and your serial log. "It does not boot" gets no
    help; "GRUB prints X then resets, here is my multiboot header" gets an answer.
