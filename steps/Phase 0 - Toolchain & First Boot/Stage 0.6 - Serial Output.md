@@ -1,4 +1,4 @@
-# Stage 0.4 — Serial Output First
+# Stage 0.6 — Serial Output
 
 **Difficulty:** Medium · ~45 minutes
 **Phase:** [[Phase 0 - Overview|Phase 0 — Toolchain & First Boot]]
@@ -85,7 +85,7 @@ Port I/O needs `outb`/`inb`, which are inline assembly — so they live in
 
 ## How to verify
 
-You cannot boot until Stage 0.7 builds an image. From then on:
+You cannot boot until Stage 0.5 builds an image. From then on:
 
 ```sh
 make run-serial
@@ -151,4 +151,4 @@ changes in the whole vault.
 - [[14 - Debugging Playbook]] — why serial is the first thing every failure section
   asks about
 
-Next: **Stage 0.5 - Panic and KASSERT**
+Next: **Stage 0.7 - Panic and KASSERT**

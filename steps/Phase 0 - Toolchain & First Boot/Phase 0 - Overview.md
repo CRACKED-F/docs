@@ -53,14 +53,20 @@ makes targeting 64-bit tractable — and you still build your own page tables in
 | # | Stage | Difficulty | You will have |
 |---|---|---|---|
 | 0.1 | [[Stage 0.1 - Prove Your Toolchain Works]] | Very Easy | Confidence the container, compiler, and QEMU run |
-| 0.2 | Stage 0.2 - The Limine Request Section | Easy | A kernel Limine recognises and will load |
-| 0.3 | Stage 0.3 - Freestanding C++ and kmain | Medium | `kmain` in C++, reached from the bootloader |
-| 0.4 | Stage 0.4 - Serial Output First | Medium | **A character out of COM1 — your first proof of life** |
-| 0.5 | Stage 0.5 - Panic and KASSERT | Medium | Faults halt with a register dump, not a reboot loop |
-| 0.6 | Stage 0.6 - The Linker Script and Higher-Half Layout | Hard | The kernel at `0xFFFFFFFF80000000` |
-| 0.7 | Stage 0.7 - Building a Bootable Image | Medium | Hybrid ISO and a GPT disk image |
-| 0.8 | Stage 0.8 - The Build System and make run | Easy | One command builds and boots |
+| 0.2 | [[Stage 0.2 - The Limine Request Section]] | Easy | A kernel Limine recognises and will load |
+| 0.3 | [[Stage 0.3 - Freestanding C++ and kmain]] | Medium | `kmain` in C++, and our own `BootInfo` |
+| 0.4 | Stage 0.4 - The Linker Script and Higher-Half Layout | Hard | A linked kernel at `0xFFFFFFFF80000000` |
+| 0.5 | Stage 0.5 - Building a Bootable Image | Medium | **FIRST BOOT** — hybrid ISO, kernel reached and halted |
+| 0.6 | [[Stage 0.6 - Serial Output]] | Medium | **FIRST OUTPUT** — a line of text out of COM1 |
+| 0.7 | [[Stage 0.7 - Panic and KASSERT]] | Medium | Faults halt with a register dump, not a reboot loop |
+| 0.8 | Stage 0.8 - The Build System | Easy | `make run` builds and boots in one command |
 | 0.9 | Stage 0.9 - CI From Day One | Medium | Every push builds and boot-tests automatically |
+
+> **Note on ordering.** Boot comes *before* serial (0.5 before 0.6), deliberately.
+> Each stage should change one thing: 0.5 proves the boot chain works with a kernel
+> that only halts — verified through the QEMU monitor — and 0.6 then adds output. If
+> you write serial code first and it does not appear, you have three unverified
+> stages to debug at once instead of one.
 
 **Stage 0.9 is not optional and it is not premature.** Turning CI on before there is
 much to test is the point: it is trivial now and painful later, and from this moment
