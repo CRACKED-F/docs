@@ -1,0 +1,61 @@
+name: Stage
+description: Track a stage from the roadmap
+labels: [stage]
+projects: ["CRACKED-F/1"]
+body:
+  - type: input
+    id: stage
+    attributes:
+      label: Stage
+      placeholder: 'Stage 9.5 - The AHCI Driver'
+    validations: { required: true }
+
+  - type: input
+    id: phase
+    attributes:
+      label: Phase
+      placeholder: 'Phase 9 - Storage'
+    validations: { required: true }
+
+  - type: dropdown
+    id: owner
+    attributes:
+      label: Default owner
+      description: See the ownership split in steps/12 - Team Workflow.
+      options:
+        - 'A — Down (arch, mm, drivers, platform)'
+        - 'B — Up (fs, syscall, sched, libc, user, net)'
+        - 'Shared'
+    validations: { required: true }
+
+  - type: textarea
+    id: blocked-by
+    attributes:
+      label: Blocked by
+      description: Which stages must merge before this one is Ready?
+      placeholder: |
+        - #41 Stage 9.1 - Block Device Interface
+        - #43 Stage 11.3 - PCI Enumeration
+
+  - type: textarea
+    id: interface
+    attributes:
+      label: Interface to agree first
+      description: >
+        If this stage spans both halves of the ownership split, name the header
+        that must be agreed and merged before either side starts. This is the
+        interface-first rule and it is what lets two people work in parallel.
+      placeholder: 'kernel/include/kernel/blockdev.hpp'
+
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+      value: |
+        - [ ] Implemented
+        - [ ] Test at the appropriate tier, passing in CI
+        - [ ] Stage note's "How to verify" actually verified
+        - [ ] Docs updated
+        - [ ] ADR written if a significant decision was made
+        - [ ] `master` still boots
+    validations: { required: true }

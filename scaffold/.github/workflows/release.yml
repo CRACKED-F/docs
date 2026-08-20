@@ -1,0 +1,199 @@
+name: Release
+
+# Triggered by a v* tag. Builds every artefact, tests the RELEASE images (not
+# test builds), generates checksums and a changelog, and publishes a DRAFT
+# GitHub Release.
+#
+# The release is a draft on purpose: CI cannot boot real hardware. A human runs
+# the manual checklist in steps/11 - Release and Deployment, then publishes.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v0.4.1)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  # -------------------------------------------------------------------------
+  # A tag does not get to skip the tests.
+  # -------------------------------------------------------------------------
+  verify:
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Tag must be on master
+        run: |
+          git fetch origin master --depth=100
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/master; then
+            echo "::error::Tag ${GITHUB_REF_NAME} is not an ancestor of master. Refusing to release."
+            exit 1
+          fi
+
+      - name: Version sanity
+        run: |
+          case "${GITHUB_REF_NAME}" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::Tag must be vMAJOR.MINOR.PATCH"; exit 1 ;;
+          esac
+
+      - run: make lint
+      - run: make test-unit
+
+  # -------------------------------------------------------------------------
+  # Build the real artefacts, in release configuration.
+  # -------------------------------------------------------------------------
+  build:
+    needs: verify
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Reproducible build timestamp
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> "$GITHUB_ENV"
+
+      - name: Build release artefacts
+        run: make BUILD_TYPE=Release iso img vm-images
+
+      - name: Rename with version
+        run: |
+          V="${GITHUB_REF_NAME}"
+          cd build
+          mv os.iso        "os-${V}.iso"
+          mv os.img        "os-${V}.img"
+          mv kernel.elf    "kernel-${V}.elf"
+          mv kernel.sym    "kernel-${V}.sym"
+          [ -f os.ova  ] && mv os.ova  "os-${V}.ova"  || true
+          [ -f os.vhdx ] && mv os.vhdx "os-${V}.vhdx" || true
+          xz -T0 -9 "os-${V}.img"
+
+      - name: Checksums
+        run: cd build && sha256sum os-* kernel-* > SHA256SUMS && cat SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: build/
+
+  # -------------------------------------------------------------------------
+  # Test what you actually ship, across the full boot matrix.
+  # -------------------------------------------------------------------------
+  verify-images:
+    needs: build
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { name: bios-iso, firmware: bios, media: iso, smp: 1 }
+          - { name: uefi-iso, firmware: uefi, media: iso, smp: 1 }
+          - { name: uefi-img, firmware: uefi, media: img, smp: 1 }
+          - { name: uefi-smp, firmware: uefi, media: img, smp: 4 }
+          - { name: low-mem,  firmware: uefi, media: img, smp: 1, mem: 128M }
+          - { name: high-mem, firmware: uefi, media: img, smp: 4, mem: 8G }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: release-artifacts, path: build/ }
+      - name: Restore canonical names
+        run: |
+          cd build
+          V="${GITHUB_REF_NAME}"
+          cp "os-${V}.iso" os.iso
+          xz -dk "os-${V}.img.xz" && mv "os-${V}.img" os.img
+      - name: Boot release image (${{ matrix.name }})
+        run: |
+          ./scripts/test.sh boot \
+            --firmware ${{ matrix.firmware }} \
+            --media    ${{ matrix.media }} \
+            --smp      ${{ matrix.smp }} \
+            --mem      ${{ matrix.mem || '512M' }} \
+            --timeout  120
+      - name: Verify clean ACPI shutdown
+        run: ./scripts/test.sh shutdown --firmware ${{ matrix.firmware }} --media ${{ matrix.media }}
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-failure-${{ matrix.name }}
+          path: build/*.log
+
+  # -------------------------------------------------------------------------
+  # Publish as a DRAFT. A human finishes the job.
+  # -------------------------------------------------------------------------
+  publish:
+    needs: verify-images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/download-artifact@v4
+        with: { name: release-artifacts, path: build/ }
+
+      - name: Generate changelog
+        run: |
+          PREV=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || echo "")
+          {
+            echo "## What changed"
+            echo
+            if [ -n "$PREV" ]; then
+              git log --no-merges --pretty='- %s (%h)' "${PREV}..${GITHUB_REF_NAME}"
+            else
+              git log --no-merges --pretty='- %s (%h)'
+            fi
+            echo
+            echo "## Artefacts"
+            echo
+            echo '| File | What it is | Use it for |'
+            echo '|---|---|---|'
+            echo "| \`os-${GITHUB_REF_NAME}.iso\` | Hybrid ISO, BIOS + UEFI | QEMU, VM optical, \`dd\` to USB |"
+            echo "| \`os-${GITHUB_REF_NAME}.img.xz\` | GPT disk image, ESP + root | USB, VM disk |"
+            echo "| \`os-${GITHUB_REF_NAME}.ova\` | OVF appliance | VirtualBox / VMware import |"
+            echo "| \`os-${GITHUB_REF_NAME}.vhdx\` | Hyper-V disk | Windows 11 Hyper-V |"
+            echo "| \`kernel-${GITHUB_REF_NAME}.sym\` | Symbol table | symbolising a panic report |"
+            echo
+            echo "## Install"
+            echo
+            echo '```sh'
+            echo "# Verify first"
+            echo "sha256sum -c SHA256SUMS"
+            echo
+            echo "# QEMU"
+            echo "qemu-system-x86_64 -cdrom os-${GITHUB_REF_NAME}.iso -serial stdio -m 512M"
+            echo
+            echo "# USB (DESTROYS the target device — check it twice)"
+            echo "xz -d os-${GITHUB_REF_NAME}.img.xz"
+            echo "sudo dd if=os-${GITHUB_REF_NAME}.img of=/dev/sdX bs=4M status=progress conv=fsync"
+            echo '```'
+            echo
+            echo "> Disable Secure Boot on the target machine — our bootloader is unsigned."
+            echo
+            echo "## Known limitations"
+            echo
+            sed -n '/^## Known limitations/,/^## /p' CHANGELOG.md | sed '1d;$d' || true
+          } > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          files: build/*
+          fail_on_unmatched_files: true
+
+      - name: Remind the human
+        run: |
+          echo "::notice::Draft release created. Run the manual checklist in"
+          echo "::notice::steps/11 - Release and Deployment — especially the REAL HARDWARE rows — then publish."
