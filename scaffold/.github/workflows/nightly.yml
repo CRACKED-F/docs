@@ -1,0 +1,122 @@
+name: Nightly
+
+# The things too slow or too flaky to gate a merge on.
+#
+# A flaky merge gate is worse than no gate — it trains people to hit re-run
+# without reading. So stress, soak, and the full matrix live here instead of
+# in ci.yml.
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  full-matrix:
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        firmware: [bios, uefi]
+        media:    [iso, img]
+        smp:      [1, 2, 4, 8]
+        mem:      ['128M', '512M', '4G']
+        exclude:
+          # BIOS + img is not a configuration we support or ship.
+          - firmware: bios
+            media: img
+    steps:
+      - uses: actions/checkout@v4
+      - run: make iso img
+      - run: |
+          ./scripts/test.sh boot \
+            --firmware ${{ matrix.firmware }} \
+            --media    ${{ matrix.media }} \
+            --smp      ${{ matrix.smp }} \
+            --mem      ${{ matrix.mem }} \
+            --timeout  120
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-${{ matrix.firmware }}-${{ matrix.media }}-${{ matrix.smp }}-${{ matrix.mem }}
+          path: build/*.log
+
+  stress:
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - run: make iso
+
+      - name: Heap torture (1M random alloc/free)
+        run: ./scripts/test.sh stress --suite heap --iterations 1000000
+
+      - name: Scheduler stress (500 tasks, 4 cores)
+        run: ./scripts/test.sh stress --suite sched --tasks 500 --smp 4
+
+      - name: Filesystem torture + fsck
+        # Random write/read/delete, then unmount, remount, fsck. Must come back
+        # clean — this is what catches write-ordering bugs (ADR-0009).
+        run: ./scripts/test.sh stress --suite fs --iterations 50000
+
+      - name: Soak (30 min idle)
+        # Catches tick drift, slow memory growth, and lost wakeups that a
+        # 90-second boot test will never see.
+        run: ./scripts/test.sh soak --minutes 30
+
+  reproducibility:
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Build twice, diff artefacts
+        run: make verify-repro
+
+  sanitisers:
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tier 1 under ASan + UBSan
+        run: make test-unit SANITIZE=address,undefined
+
+  report:
+    needs: [full-matrix, stress, reproducibility, sanitisers]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'Nightly failure';
+            const body = [
+              `Nightly run failed: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              '',
+              'Check the uploaded serial logs before anything else — the kernel',
+              'usually says what happened.',
+            ].join('\n');
+
+            // Update the existing issue rather than opening a new one every night.
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', labels: 'nightly-failure',
+            });
+
+            if (open.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: open[0].number, body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title, body, labels: ['nightly-failure', 'bug'],
+              });
+            }

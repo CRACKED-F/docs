@@ -1,0 +1,82 @@
+name: Bug report
+description: Something in the OS behaves incorrectly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Kernel bugs surface far from their cause. The more of this you fill in,
+        the shorter the debugging session.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: Output of `git describe --tags --dirty`, or the release tag.
+      placeholder: v0.4.1-17-gabc1234
+    validations: { required: true }
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Where does it happen?
+      multiple: true
+      options:
+        - QEMU (BIOS)
+        - QEMU (UEFI / OVMF)
+        - VirtualBox
+        - VMware
+        - Hyper-V
+        - Real hardware
+    validations: { required: true }
+
+  - type: input
+    id: config
+    attributes:
+      label: Boot configuration
+      placeholder: '-smp 4 -m 512M, os.img, UEFI'
+    validations: { required: true }
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Expected vs actual.
+    validations: { required: true }
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands. If it is intermittent, say roughly how often.
+      placeholder: |
+        1. make run-uefi
+        2. type `cat /etc/motd`
+        3. panic
+    validations: { required: true }
+
+  - type: textarea
+    id: serial
+    attributes:
+      label: Serial log
+      description: >
+        The single most useful thing you can attach. `make run-serial` or the
+        `serial.log` from a CI artefact. Include the panic block if there is one.
+      render: text
+    validations: { required: true }
+
+  - type: textarea
+    id: ruled-out
+    attributes:
+      label: What you have already ruled out
+      description: >
+        Saves the next person from repeating your work. See the one-hour rule in
+        steps/12 - Team Workflow.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before filing
+      options:
+        - label: I checked whether it reproduces on `master`
+        - label: I read the relevant "Common traps" section in the stage note

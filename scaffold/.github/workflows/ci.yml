@@ -1,0 +1,207 @@
+
+name: CI
+
+# The merge gate. Staged so cheap checks fail fast — there is no point booting
+# a kernel that does not lint.
+#
+# Every job runs `make <target>` inside the same pinned container the team uses
+# locally. CI has no private build recipe: when it fails, you reproduce it with
+# one command. See steps/10 - CI Pipeline.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# NOTE: pin this to a digest, not a tag, before you rely on it:
+#   container: ghcr.io/cracked-f/os-toolchain@sha256:<digest>
+# The `env` context is NOT available in `jobs.<id>.container.image`, so the
+# reference is repeated per job rather than factored into a variable.
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Boundary + style enforcement. ~30s. Fails fast.
+  # -------------------------------------------------------------------------
+  lint:
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: clang-format
+        run: |
+          find kernel libc user tools tests \
+               \( -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h' \) -print0 \
+            | xargs -0 clang-format --dry-run --Werror
+
+      - name: Generate compile database
+        run: make compile-commands
+
+      # --- Architectural boundary rules. Each protects a specific ADR. ---
+
+      - name: 'Boundary: every kernel TU has -mno-red-zone'
+        # Missing this flag = interrupts clobber the red zone = random,
+        # unreproducible corruption discovered weeks later. ADR-0002.
+        run: |
+          bad=$(jq -r '.[]
+                       | select(.file | test("/kernel/"))
+                       | select((.command // (.arguments | join(" "))) | contains("-mno-red-zone") | not)
+                       | .file' build/compile_commands.json)
+          if [ -n "$bad" ]; then
+            echo "::error::Kernel translation units missing -mno-red-zone:"
+            echo "$bad"
+            exit 1
+          fi
+
+      - name: 'Boundary: limine.h confined to arch/x86_64/boot'
+        # The escape hatch in ADR-0003 is worthless if the protocol leaks.
+        run: |
+          leak=$(grep -rl 'limine\.h' kernel/ --include='*.?pp' --include='*.h' 2>/dev/null \
+                 | grep -v '^kernel/arch/x86_64/boot/' || true)
+          if [ -n "$leak" ]; then
+            echo "::error::limine.h included outside arch/x86_64/boot/:"
+            echo "$leak"
+            exit 1
+          fi
+
+      - name: 'Boundary: no inline asm outside arch/'
+        # Keeps a second architecture additive rather than invasive. ADR-0008.
+        run: |
+          leak=$(grep -rnE '\b(asm|__asm__)[[:space:]]*(volatile)?[[:space:]]*\(' kernel/ \
+                   --include='*.cpp' --include='*.hpp' 2>/dev/null \
+                 | grep -v '^kernel/arch/' || true)
+          if [ -n "$leak" ]; then
+            echo "::error::Inline assembly outside kernel/arch/:"
+            echo "$leak"
+            exit 1
+          fi
+
+      - name: 'Boundary: kernel does not include userspace'
+        run: |
+          leak=$(grep -rnE '#include[[:space:]]*[<"](libc|user)/' kernel/ 2>/dev/null || true)
+          if [ -n "$leak" ]; then
+            echo "::error::Kernel includes userspace headers:"
+            echo "$leak"
+            exit 1
+          fi
+
+      - name: 'Repro: no __DATE__ / __TIME__'
+        run: |
+          leak=$(grep -rn '__DATE__\|__TIME__' kernel/ libc/ user/ 2>/dev/null || true)
+          if [ -n "$leak" ]; then
+            echo "::error::__DATE__/__TIME__ break reproducible builds:"
+            echo "$leak"
+            exit 1
+          fi
+
+      - name: 'Debt: no TODO without an issue number'
+        run: |
+          leak=$(grep -rnP 'TODO(?!\(#\d+\))' kernel/ libc/ user/ 2>/dev/null || true)
+          if [ -n "$leak" ]; then
+            echo "::error::TODO without an issue reference — use TODO(#123):"
+            echo "$leak"
+            exit 1
+          fi
+
+      - name: clang-tidy
+        run: make lint-tidy
+
+  # -------------------------------------------------------------------------
+  # Build everything. ~2min.
+  # -------------------------------------------------------------------------
+  build:
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: /ccache
+          key: ccache-${{ runner.os }}-${{ hashFiles('**/*.cpp', '**/*.hpp', '**/*.asm') }}
+          restore-keys: ccache-${{ runner.os }}-
+
+      - run: make iso img
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: images
+          path: |
+            build/os.iso
+            build/os.img
+            build/kernel.elf
+            build/kernel.sym
+          retention-days: 14
+
+  # -------------------------------------------------------------------------
+  # Tier 1 — host unit tests. ~20s.
+  # -------------------------------------------------------------------------
+  test-unit:
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test-unit
+
+  # -------------------------------------------------------------------------
+  # Tier 2 — in-kernel self-tests under QEMU. ~2min.
+  # Reports via the isa-debug-exit device. ADR-0010.
+  # -------------------------------------------------------------------------
+  test-kernel:
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test-kernel
+      - name: Upload serial log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-kernel-logs
+          path: |
+            build/serial.log
+            build/qemu-stderr.log
+            build/kernel.elf
+
+  # -------------------------------------------------------------------------
+  # Tier 3 — integration boot tests across the boot matrix. ~3min.
+  # A bug that only appears under UEFI is exactly the bug that ruins a release.
+  # -------------------------------------------------------------------------
+  test-boot:
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: bios-iso,  firmware: bios, media: iso, smp: 1 }
+          - { name: uefi-iso,  firmware: uefi, media: iso, smp: 1 }
+          - { name: uefi-img,  firmware: uefi, media: img, smp: 1 }
+          - { name: uefi-smp,  firmware: uefi, media: img, smp: 4 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: images
+          path: build/
+      - name: Boot test (${{ matrix.name }})
+        run: |
+          ./scripts/test.sh boot \
+            --firmware ${{ matrix.firmware }} \
+            --media    ${{ matrix.media }} \
+            --smp      ${{ matrix.smp }} \
+            --timeout  90
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-logs-${{ matrix.name }}
+          path: build/*.log

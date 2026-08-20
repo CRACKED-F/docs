@@ -1,0 +1,40 @@
+# Build output
+/build/
+/boot/stage/
+compile_commands.json
+*.o
+*.d
+*.elf
+*.bin
+*.iso
+*.img
+*.img.xz
+*.ova
+*.vhdx
+*.sym
+
+# Test output
+*.log
+serial.log
+qemu-stderr.log
+/tests/**/output/
+.pytest_cache/
+__pycache__/
+
+# Toolchain / vendor
+/boot/limine/
+/.ccache/
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+*.swp
+.cache/
+.clangd/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
