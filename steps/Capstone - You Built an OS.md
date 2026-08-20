@@ -55,7 +55,7 @@ Pick what interests you. Each is a new mini-project on the base you built.
   <https://github.com/SerenityOS/serenity>, SkiftOS
   <https://github.com/skift-org/skift>.
 
-See **[[03 - Resources & Reading]]** for the full list.
+See **[[03 - Resources and Reading]]** for the full list.
 
 ---
 
