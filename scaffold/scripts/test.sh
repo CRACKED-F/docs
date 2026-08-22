@@ -17,7 +17,19 @@ set -Eeuo pipefail
 
 BUILD_DIR="${BUILD_DIR:-build}"
 QEMU="${QEMU:-qemu-system-x86_64}"
-OVMF_CODE="${OVMF_CODE:-/usr/share/OVMF/OVMF_CODE.fd}"
+# UEFI firmware. The path differs per platform, so take the first that exists:
+# Ubuntu 24.04 renamed it to OVMF_CODE_4M.fd, older Debian/Ubuntu use
+# OVMF_CODE.fd, and Homebrew QEMU on macOS ships edk2-x86_64-code.fd.
+if [[ -z "${OVMF_CODE:-}" ]]; then
+  for _f in /usr/share/OVMF/OVMF_CODE_4M.fd \
+            /usr/share/OVMF/OVMF_CODE.fd \
+            /usr/share/ovmf/OVMF.fd \
+            /opt/homebrew/share/qemu/edk2-x86_64-code.fd \
+            /usr/local/share/qemu/edk2-x86_64-code.fd; do
+    [[ -f "$_f" ]] && { OVMF_CODE="$_f"; break; }
+  done
+fi
+OVMF_CODE="${OVMF_CODE:-/usr/share/OVMF/OVMF_CODE_4M.fd}"
 
 FIRMWARE=bios
 MEDIA=iso
