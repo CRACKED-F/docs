@@ -185,7 +185,9 @@ why a function or template would not do.
 
 - `#pragma once`. Include guards are noise.
 - Include what you use; do not rely on transitive includes.
-- Order: own header, then kernel headers, then freestanding `<cstdint>` etc.
+- Order: own header, then kernel headers, then GCC's freestanding C headers
+  (`<stdint.h>`, `<stddef.h>` etc. — there is no libstdc++ in the toolchain, see
+  [[ADR-0007 - Freestanding C++20 as the Kernel Language]]).
 - Keep subsystem-internal headers beside the source, not in `include/`.
 - `include/abi/` is plain C, `extern "C"`-safe, because libc consumes it.
 

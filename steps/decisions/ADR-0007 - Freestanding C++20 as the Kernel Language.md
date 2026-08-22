@@ -34,11 +34,29 @@ best or a mysterious fault at worst.
 - `constexpr` / `consteval` for compile-time table generation (GDT, IDT, page flags)
 - `[[nodiscard]]`, `[[maybe_unused]]`, `static_assert`
 - Concepts, for readable template constraints
-- `std::` types from **freestanding-safe headers only**: `<cstdint>`, `<cstddef>`,
-  `<type_traits>`, `<limits>`, `<utility>`, `<bit>`, `<concepts>`, `<atomic>`.
-  These are header-only and require no runtime.
-- Our own `kstd::` namespace for kernel-safe containers (`kstd::vector`,
+- **GCC's freestanding C headers**: `<stdint.h>`, `<stddef.h>`, `<stdarg.h>`,
+  `<stdbool.h>`, `<limits.h>`, `<float.h>`. These are built into the compiler, not
+  into a library, so they are available with no libc and no libstdc++.
+- Our own **`kstd::` namespace** for everything else — the type traits and utilities
+  the kernel actually uses, and later kernel-safe containers (`kstd::vector`,
   `kstd::optional`, `kstd::span`) once the heap exists in Phase 4.
+
+> **No C++ standard headers.** `<cstdint>`, `<type_traits>`, `<bit>`, `<atomic>` and
+> friends live in **libstdc++**, which our toolchain image does not build or install
+> — `toolchain/Dockerfile` runs `make all-gcc all-target-libgcc` and stops there.
+> `#include <cstdint>` fails with `fatal error: cstdint: No such file or directory`.
+>
+> This is deliberate, not an oversight. Building a freestanding libstdc++ adds
+> 5–10 minutes to every toolchain image build, on both developers' machines and in
+> CI, for headers the kernel would use a fraction of. Worse, libstdc++'s
+> `std::atomic` can emit calls into `libatomic` for some types — a link failure that
+> would surface in [[Phase 12 - Overview|Phase 12]] SMP code, at the worst possible
+> moment. Owning the atomics means knowing exactly which instruction each one
+> becomes.
+>
+> Kernel compiles pass `-nostdinc++` so this fails loudly and immediately rather
+> than depending on what happens to be installed. See
+> [[Stage 0.8 - The Build System]].
 
 ### Assembly
 

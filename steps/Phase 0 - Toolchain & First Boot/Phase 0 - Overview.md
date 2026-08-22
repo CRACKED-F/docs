@@ -12,6 +12,30 @@ reproducible build, and a way for the kernel to tell you what went wrong.
 
 ---
 
+## Phase progress
+
+Tick these off as you go. Each links to a stage note with its own detailed
+checklist, line-by-line code walkthrough, and tradeoff analysis.
+
+- [ ] **0.1** [[Stage 0.1 - Prove Your Toolchain Works]] — container, cross-compiler, and QEMU all answer
+- [ ] **0.2** [[Stage 0.2 - The Limine Request Section]] — a kernel Limine recognises
+- [ ] **0.3** [[Stage 0.3 - Freestanding C++ and kmain]] — `kmain`, and our own `BootInfo`
+- [ ] **0.4** [[Stage 0.4 - The Linker Script and Higher-Half Layout]] — linked at `0xFFFFFFFF80000000`
+- [ ] **0.5** [[Stage 0.5 - Building a Bootable Image]] — 🎉 **FIRST BOOT**
+- [ ] **0.6** [[Stage 0.6 - Serial Output]] — 🎉 **FIRST OUTPUT**
+- [ ] **0.7** [[Stage 0.7 - Panic and KASSERT]] — faults halt with a register dump
+- [ ] **0.8** [[Stage 0.8 - The Build System]] — `make run` does everything
+- [ ] **0.9** [[Stage 0.9 - CI From Day One]] — every push is built and boot-tested
+
+**Phase complete when:**
+
+- [ ] `make run` boots under BIOS and greets you over serial
+- [ ] `make run-uefi` does the same under OVMF
+- [ ] A deliberate null dereference panics with a register dump — no reboot loop
+- [ ] `git push` runs the whole thing in CI and comes back green
+
+---
+
 ## Why this phase exists
 
 Between "I wrote `kmain`" and "it runs" sit five things that must all be correct: the
@@ -21,11 +45,12 @@ This phase turns each on separately, so when something breaks you know which one
 
 It also front-loads two things the original plan left until far too late:
 
-- **Serial output before anything else** (Stage 0.4). It survives a crash, it is
-  captured to a file, and it works before the framebuffer exists. It is the reason
-  every later failure is diagnosable.
-- **Panic and `KASSERT`** (Stage 0.5). Every Tier-2 test in
-  [[09 - Testing Strategy]] is built on `KASSERT`, so it cannot be an afterthought.
+- **Serial output early** ([[Stage 0.6 - Serial Output|Stage 0.6]]). It survives a
+  crash, it is captured to a file, and it works before the framebuffer exists. It is
+  the reason every later failure is diagnosable.
+- **Panic and `KASSERT`** ([[Stage 0.7 - Panic and KASSERT|Stage 0.7]]). Every Tier-2
+  test in [[09 - Testing Strategy]] is built on `KASSERT`, so it cannot be an
+  afterthought.
 
 ---
 
@@ -55,18 +80,23 @@ makes targeting 64-bit tractable — and you still build your own page tables in
 | 0.1 | [[Stage 0.1 - Prove Your Toolchain Works]] | Very Easy | Confidence the container, compiler, and QEMU run |
 | 0.2 | [[Stage 0.2 - The Limine Request Section]] | Easy | A kernel Limine recognises and will load |
 | 0.3 | [[Stage 0.3 - Freestanding C++ and kmain]] | Medium | `kmain` in C++, and our own `BootInfo` |
-| 0.4 | Stage 0.4 - The Linker Script and Higher-Half Layout | Hard | A linked kernel at `0xFFFFFFFF80000000` |
-| 0.5 | Stage 0.5 - Building a Bootable Image | Medium | **FIRST BOOT** — hybrid ISO, kernel reached and halted |
+| 0.4 | [[Stage 0.4 - The Linker Script and Higher-Half Layout]] | Hard | A linked kernel at `0xFFFFFFFF80000000` |
+| 0.5 | [[Stage 0.5 - Building a Bootable Image]] | Medium | **FIRST BOOT** — hybrid ISO, kernel reached and halted |
 | 0.6 | [[Stage 0.6 - Serial Output]] | Medium | **FIRST OUTPUT** — a line of text out of COM1 |
 | 0.7 | [[Stage 0.7 - Panic and KASSERT]] | Medium | Faults halt with a register dump, not a reboot loop |
-| 0.8 | Stage 0.8 - The Build System | Easy | `make run` builds and boots in one command |
-| 0.9 | Stage 0.9 - CI From Day One | Medium | Every push builds and boot-tests automatically |
+| 0.8 | [[Stage 0.8 - The Build System]] | Medium | `make run` builds and boots in one command |
+| 0.9 | [[Stage 0.9 - CI From Day One]] | Medium | Every push builds and boot-tests automatically |
 
 > **Note on ordering.** Boot comes *before* serial (0.5 before 0.6), deliberately.
 > Each stage should change one thing: 0.5 proves the boot chain works with a kernel
 > that only halts — verified through the QEMU monitor — and 0.6 then adds output. If
 > you write serial code first and it does not appear, you have three unverified
 > stages to debug at once instead of one.
+
+> **Note on the build system.** Stages 0.1–0.7 compile with hand-typed
+> `x86_64-elf-g++` commands. That is deliberate: you see exactly which flags matter
+> and why before a build system hides them. [[Stage 0.8 - The Build System|Stage 0.8]]
+> then replaces the hand-typing with CMake.
 
 **Stage 0.9 is not optional and it is not premature.** Turning CI on before there is
 much to test is the point: it is trivial now and painful later, and from this moment
