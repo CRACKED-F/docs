@@ -105,12 +105,36 @@ warnings at once, which nobody ever does.
 
 ---
 
+## Kernel link flags
+
+Separate from the compile flags, and just as load-bearing.
+
+```cmake
+-T kernel/arch/x86_64/boot/linker.ld   # our layout, not the default
+-nostdlib                              # no crt0, no libc, no default libs
+-static                                # no dynamic loader exists
+-z max-page-size=0x1000                # ◄── 4 KiB, not the 2 MiB default
+-Wl,--build-id=none                    # reproducibility
+```
+
+`-z max-page-size=0x1000` deserves the same attention as `-mno-red-zone`. The
+x86-64 linker defaults to a **2 MiB** maximum page size and aligns segments
+accordingly. That silently defeats the 4 KiB section alignment the linker script
+asks for, pads the image by megabytes, and leaves sections whose boundaries do not
+land on the page granularity the VMM will use to apply per-section permissions in
+Phase 15. Set it once, here.
+
+---
+
 ## The linker script
 
 `kernel/arch/x86_64/boot/linker.ld` places the kernel at `0xFFFFFFFF80000000`
 ([[06 - Architecture Overview]]) and must:
 
-- keep the Limine request section (`.requests`) findable by the bootloader
+- keep the Limine request sections (`.limine_requests`, plus the
+  `.limine_requests_start` / `.limine_requests_end` marker sections) findable by the
+  bootloader — `KEEP()` them, or `--gc-sections` discards them and Limine silently
+  finds no requests. See [[Stage 0.4 - The Linker Script and Higher-Half Layout]].
 - 4 KiB-align `.text`, `.rodata`, `.data`, `.bss` so page permissions can differ per
   section — this is what makes W^X in Phase 15 possible without relayout
 - export `__kernel_start`, `__kernel_end`, `__text_start/end`, `__rodata_start/end`,

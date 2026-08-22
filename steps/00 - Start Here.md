@@ -13,6 +13,9 @@ exactly what to build, then tells you how to check it works.
 > **New here?** Read [[01 - How To Use These Docs]], then [[06 - Architecture Overview]],
 > then set up your machine with [[02 - Toolchain Setup]].
 >
+> **Ready to build?** [[Progress Tracker]] is the one page with every stage and a
+> checkbox each. Start at [[Stage 0.1 - Prove Your Toolchain Works]].
+>
 > **Wondering why this looks different from a typical OS tutorial?** Read
 > [[05 - Gap Analysis (v1 to Product)]].
 
