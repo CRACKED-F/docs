@@ -34,7 +34,23 @@ RUNQ := $(subst -it,,$(RUN))
 QEMU       ?= qemu-system-x86_64
 QEMU_MEM   ?= 512M
 QEMU_SMP   ?= 1
-OVMF_CODE  ?= /usr/share/OVMF/OVMF_CODE.fd
+# UEFI firmware for `make run-uefi`. The path differs per platform, so take the
+# first one that exists. Ubuntu 24.04 renamed it to OVMF_CODE_4M.fd; older
+# Debian/Ubuntu use OVMF_CODE.fd; Homebrew QEMU on macOS ships edk2-x86_64-code.fd.
+# Override if yours is elsewhere:  make run-uefi OVMF_CODE=/path/to/firmware.fd
+OVMF_CODE  ?= $(firstword $(wildcard \
+                /usr/share/OVMF/OVMF_CODE_4M.fd \
+                /usr/share/OVMF/OVMF_CODE.fd \
+                /usr/share/ovmf/OVMF.fd \
+                /opt/homebrew/share/qemu/edk2-x86_64-code.fd \
+                /usr/local/share/qemu/edk2-x86_64-code.fd))
+
+# Serial goes to your terminal AND to a file, in one shot. The terminal is for
+# the edit-run loop; the file is what survives the crash, what you paste into a
+# bug report, and what `scripts/test.sh` greps. A run whose only output vanished
+# with the QEMU window is a run you cannot debug.
+SERIAL_LOG ?= $(BUILD_DIR)/serial.log
+SERIAL_TEE ?= -chardev stdio,id=ser0,logfile=$(SERIAL_LOG) -serial chardev:ser0
 
 .DEFAULT_GOAL := all
 .PHONY: all configure iso img vm-images run run-serial run-uefi run-smp \
@@ -66,21 +82,21 @@ compile-commands: configure       ## Generate build/compile_commands.json
 
 ## --- Run (QEMU on the HOST, not in the container) --------------------------
 
-run: iso                          ## Boot the ISO in QEMU (BIOS), serial to stdout
+run: iso                          ## Boot the ISO in QEMU (BIOS), serial to stdout + serial.log
 	$(QEMU) -cdrom $(BUILD_DIR)/os.iso \
 	    -m $(QEMU_MEM) -smp $(QEMU_SMP) \
-	    -serial stdio -no-reboot -no-shutdown
+	    $(SERIAL_TEE) -no-reboot -no-shutdown
 
 run-serial: iso                   ## Boot headless, serial only
 	$(QEMU) -cdrom $(BUILD_DIR)/os.iso \
 	    -m $(QEMU_MEM) -display none \
-	    -serial stdio -no-reboot -no-shutdown
+	    $(SERIAL_TEE) -no-reboot -no-shutdown
 
 run-uefi: img                     ## Boot the disk image under UEFI (OVMF)
 	$(QEMU) -drive format=raw,file=$(BUILD_DIR)/os.img \
 	    -bios $(OVMF_CODE) \
 	    -m $(QEMU_MEM) -smp $(QEMU_SMP) \
-	    -serial stdio -no-reboot -no-shutdown
+	    $(SERIAL_TEE) -no-reboot -no-shutdown
 
 run-smp: img                      ## Boot with 4 cores under UEFI
 	$(MAKE) run-uefi QEMU_SMP=4

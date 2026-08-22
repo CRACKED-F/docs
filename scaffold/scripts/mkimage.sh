@@ -34,8 +34,16 @@ require() {
 # ---------------------------------------------------------------------------
 stage_common() {
   require "$KERNEL"
-  require "$INITRD"
   require "boot/limine.conf"
+
+  # The initrd does not exist until Phase 7 (tools/mkinitrd). Until then stage an
+  # empty archive: the image still builds, and Limine still finds the module that
+  # limine.conf tells it to load instead of failing the boot entry.
+  if [[ ! -f "$INITRD" ]]; then
+    echo ">> note: ${INITRD} not built yet — staging an empty placeholder (Phase 7 replaces it)"
+    mkdir -p "$(dirname "$INITRD")"
+    tar -cf "$INITRD" -T /dev/null
+  fi
 
   rm -rf "$STAGE"
   mkdir -p "$STAGE/EFI/BOOT"

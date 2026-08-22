@@ -17,12 +17,23 @@ fail=0
 
 rule() { printf '\033[1m%-52s\033[0m' "$1"; }
 ok()   { printf '\033[32mok\033[0m\n'; }
+skip() { printf '\033[33mskip\033[0m (%s)\n' "$1"; }
 bad()  { printf '\033[31mFAIL\033[0m\n'; fail=1; }
+
+# Source directories that exist yet. Through most of Phase 0 only kernel/ does,
+# and `find` on a missing path exits non-zero — which reported a false FAIL for
+# clang-format and broke `make fmt` outright.
+SRC_DIRS=()
+for d in kernel libc user tools tests; do
+  [[ -d "$d" ]] && SRC_DIRS+=("$d")
+done
 
 # ---------------------------------------------------------------------------
 rule "clang-format"
-if find kernel libc user tools tests \
-        \( -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h' \) -print0 2>/dev/null \
+if [[ ${#SRC_DIRS[@]} -eq 0 ]]; then
+  skip "no source directories yet"
+elif find "${SRC_DIRS[@]}" \
+        \( -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h' \) -print0 \
      | xargs -0 -r clang-format --dry-run --Werror >/dev/null 2>&1; then
   ok
 else
@@ -41,6 +52,11 @@ if [[ -f "$CDB" ]]; then
                    | select((.command // (.arguments | join(" "))) | contains("-mno-red-zone") | not)
                    | .file' "$CDB")
   if [[ -z "$missing" ]]; then ok; else bad; echo "$missing" | sed 's/^/   /'; fi
+elif [[ ! -f CMakeLists.txt ]]; then
+  # Before Stage 0.8 there is no build system, so there is no compile database
+  # and nothing to check. Failing here would make lint red for reasons the
+  # reader cannot fix yet — which is how a CI nobody trusts gets started.
+  skip "no build system yet (Stage 0.8)"
 else
   bad; echo "   no compile_commands.json — run 'make compile-commands'"
 fi

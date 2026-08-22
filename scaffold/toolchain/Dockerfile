@@ -107,6 +107,16 @@ ENV LIMINE_DIR=/opt/limine
 # ---------------------------------------------------------------------------
 ENV CCACHE_DIR=/ccache
 ENV PATH="/usr/lib/ccache:${PATH}"
+
+# Anything running inside this image IS the execution context — the Makefile must
+# run its commands directly rather than trying to `docker run` them in a nested
+# container that does not exist. CI runs jobs with `container:` set to this image,
+# so without this every `make` step there fails with "docker: command not found".
+ENV CONTAINER=1
+
+# UEFI firmware path for scripts/test.sh. The Ubuntu 24.04 base ships
+# OVMF_CODE_4M.fd, not the OVMF_CODE.fd the scripts default to.
+ENV OVMF_CODE=/usr/share/OVMF/OVMF_CODE_4M.fd
 RUN mkdir -p /ccache && chmod 777 /ccache
 
 # ---------------------------------------------------------------------------
@@ -122,7 +132,7 @@ RUN set -e; \
     xorriso --version 2>&1 | head -1; \
     cmake --version | head -1; \
     test -f "${LIMINE_DIR}/BOOTX64.EFI" || { echo "FATAL: Limine BOOTX64.EFI missing"; exit 1; }; \
-    test -f /usr/share/OVMF/OVMF_CODE.fd || echo "WARN: OVMF path differs on this base image"; \
+    test -f "$OVMF_CODE" || { echo "FATAL: OVMF firmware missing at $OVMF_CODE"; exit 1; }; \
     echo "=== ok ==="
 
 WORKDIR /os
