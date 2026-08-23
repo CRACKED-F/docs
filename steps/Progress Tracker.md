@@ -32,15 +32,16 @@ Detailed notes: [[Phase 0 - Overview]]
 
 Detailed notes: [[Phase 1 - Overview]]
 
-> ⚠️ **These stage notes are still written against the old 32-bit VGA-text plan**
-> and contradict [[ADR-0004 - Framebuffer Console Not VGA Text]]. There is no VGA
-> text mode in this OS. Rewrite them before starting Phase 1.
+> Rewritten for the linear framebuffer. Notes 1.3, 1.6 and 1.7 are still
+> outstanding — see the markers below.
 
-- [ ] 1.1 [[Stage 1.1 - The VGA Text Buffer]] — ⚠️ needs rewrite for framebuffer
-- [ ] 1.2 [[Stage 1.2 - A Terminal Driver]]
-- [ ] 1.3 [[Stage 1.3 - Scrolling & Newlines]]
-- [ ] 1.4 [[Stage 1.4 - Serial Port Logging]] — ⚠️ superseded by [[Stage 0.6 - Serial Output]]
-- [ ] 1.5 [[Stage 1.5 - kprintf, a Formatted Printer]]
+- [ ] 1.1 [[Stage 1.1 - The Linear Framebuffer]]
+- [ ] 1.2 [[Stage 1.2 - Rasterising a Bitmap Font]]
+- [ ] 1.3 [[Stage 1.3 - A Console - Cursor, Colour, Scrolling]] — ⚠️ note is an incomplete draft
+- [ ] 1.4 [[Stage 1.4 - Double Buffering]]
+- [ ] 1.5 [[Stage 1.5 - The Log Ring Buffer and Levels]]
+- [ ] 1.6 [[Stage 1.6 - kprintf]] — ⚠️ note not written yet
+- [ ] 1.7 [[Stage 1.7 - Symbolised Backtraces]] — ⚠️ note not written yet
 
 ---
 

@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Phase 11 - Modern Platform/Phase 11 - Overview.md",
+                "file": "Phase 0 - Toolchain & First Boot/Phase 0 - Overview.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Phase 11 - Overview"
+              "title": "Phase 0 - Overview"
             }
           }
         ]
@@ -187,15 +187,18 @@
   },
   "active": "5424c0658b1bd848",
   "lastOpenFiles": [
+    "Phase 0 - Toolchain & First Boot/Stage 0.2 - The Limine Request Section.md",
+    "Phase 0 - Toolchain & First Boot/Stage 0.1 - Prove Your Toolchain Works.md",
+    "Phase 1 - Text Output/Stage 1.1 - The VGA Text Buffer.md",
+    "Phase 0 - Toolchain & First Boot/Stage 0.4 - The Linker Script and Higher-Half Layout.md",
+    "Phase 1 - Text Output/Stage 1.2 - A Terminal Driver.md",
+    "Phase 11 - Modern Platform/Phase 11 - Overview.md",
     "Phase 0 - Toolchain & First Boot/Stage 0.8 - The Build System.md",
     "00 - Start Here.md",
     "Phase 15 - Hardening and Real Hardware/Phase 15 - Overview.md",
-    "Phase 0 - Toolchain & First Boot/Stage 0.2 - The Limine Request Section.md",
-    "Phase 1 - Text Output/Stage 1.1 - The VGA Text Buffer.md",
     "Phase 3 - Drivers Timer & Keyboard/Stage 3.1 - The Programmable Interval Timer.md",
     "Phase 1 - Text Output/Phase 1 - Overview.md",
     "Phase 1 - Text Output/Stage 1.5 - kprintf, a Formatted Printer.md",
-    "Phase 0 - Toolchain & First Boot/Stage 0.1 - Prove Your Toolchain Works.md",
     "Phase 0 - Toolchain & First Boot/Phase 0 - Overview.md",
     "Capstone - You Built an OS.md",
     "Phase 8 - The Shell/Stage 8.4 - init - Wiring It Together.md",
@@ -212,9 +215,6 @@
     "Phase 7 - Filesystem & Program Loading",
     "Phase 6 - User Mode & System Calls/Stage 6.4 - A Minimal User C Library.md",
     "Phase 6 - User Mode & System Calls/Stage 6.3 - The System Call Interface.md",
-    "Phase 6 - User Mode & System Calls/Stage 6.2 - Entering Ring 3.md",
-    "Phase 6 - User Mode & System Calls/Stage 6.1 - The Task State Segment.md",
-    "Phase 6 - User Mode & System Calls/Phase 6 - Overview.md",
     "Phase 6 - User Mode & System Calls",
     "Phase 5 - Multitasking",
     "Phase 4 - Memory Management",
