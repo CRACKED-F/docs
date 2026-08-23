@@ -40,7 +40,7 @@ Detailed notes: [[Phase 1 - Overview]]
 - [ ] 1.3 [[Stage 1.3 - A Console - Cursor, Colour, Scrolling]] — ⚠️ note is an incomplete draft
 - [ ] 1.4 [[Stage 1.4 - Double Buffering]]
 - [ ] 1.5 [[Stage 1.5 - The Log Ring Buffer and Levels]]
-- [ ] 1.6 [[Stage 1.6 - kprintf]] — ⚠️ note not written yet
+- [ ] 1.6 [[Stage 1.6 - kprintf]]
 - [ ] 1.7 [[Stage 1.7 - Symbolised Backtraces]] — ⚠️ note not written yet
 
 ---

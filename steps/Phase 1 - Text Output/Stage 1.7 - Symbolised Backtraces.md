@@ -1227,3 +1227,846 @@ missing and no known rule to make it` — an error naming a file that plainly do
 Same rule, same message, same fix as `mkfont`.
 
 ---
+
+### `kernel/arch/x86_64/boot/linker.ld` — the `.ksyms` section
+
+Two edits to the script from [[Stage 0.4 - The Linker Script and Higher-Half Layout]]. This is
+the file that makes the chicken-and-egg fix real; everything else is plumbing.
+
+```ld
+PHDRS
+{
+    requests PT_LOAD FLAGS(6);   /* RW  — the bootloader writes here */
+    text     PT_LOAD FLAGS(5);   /* R E */
+    rodata   PT_LOAD FLAGS(4);   /* R   */
+    data     PT_LOAD FLAGS(6);   /* RW  */
+    ksyms    PT_LOAD FLAGS(4);   /* R   — the embedded symbol table  <-- new */
+}
+```
+
+and, in `SECTIONS`, immediately after the existing `__bss_end`:
+
+```ld
+    . = ALIGN(PAGE_SIZE);
+    __bss_end = .;
+
+    /* ------------------------------------------- the embedded symbol table
+       LAST, and in its own segment, on purpose.
+
+       tools/symbolise generates this section's contents from a link of this
+       very image. Placing it after every other output section makes it
+       IMPOSSIBLE for its size to move anything that came before it, so the
+       addresses the first link assigned are still correct in the second.
+       Read-only: nothing in the kernel ever writes it.  See Stage 1.7 §3. */
+    .ksyms : {
+        __ksyms_start = .;
+        KEEP(*(.ksyms))
+        __ksyms_end = .;
+    } :ksyms
+
+    . = ALIGN(PAGE_SIZE);
+    __kernel_end = .;
+```
+
+**Why after `.bss` and not before `.data`.** Only `.text` addresses appear in a backtrace, so
+strictly the table only has to come after `.text`. Putting it at the very end is the strongest
+form of the same guarantee at no extra cost, and it preserves something Stage 0.4 cares about:
+`.bss` must remain the **last** section inside the `:data` segment so that `p_memsz > p_filesz`
+and the loader zero-fills the tail. Append `.ksyms` to `:data` after `.bss` instead of giving
+it its own `PHDRS` entry and you put a `PROGBITS` section after a `NOBITS` one in the same
+segment — which forces the linker to materialise every zero byte of `.bss` into the file, and
+your ELF grows by the size of the kernel stack plus every static buffer in the kernel.
+
+**`KEEP(*(.ksyms))`.** Nothing in the kernel reaches the table through a relocation:
+`symbols.cpp` refers to `ksyms_addr` by name, which is a symbol reference, but the *section*
+has no incoming references from the reachability graph `--gc-sections` walks. The moment
+someone enables `--gc-sections` to shrink the image, an unprotected `.ksyms` is collected and
+every panic silently loses its names. This is exactly the `.limine_requests` argument from
+Stage 0.4, and the same belt-and-braces answer: `used` in the source, `KEEP()` in the script,
+because neither substitutes for the other.
+
+**`__kernel_end` moves; `__bss_end` does not.** The table is part of the loaded image, so the
+Phase 4 frame allocator must reserve it — that is why `__kernel_end` goes after `.ksyms`
+rather than staying where it was. `__bss_end` stays put, because every consumer of it means
+"the end of the writable region", and `.ksyms` is not writable.
+
+**One consequence worth predicting:** `__kernel_end` and `__stack_top` therefore differ between
+`kernel.stage1.elf` and `kernel.elf`. That is fine — nothing ever boots the stage-one image —
+but it is why §6's verification compares `.text` symbols specifically rather than diffing whole
+symbol tables.
+
+---
+
+### `kernel/lib/ksyms_stub.cpp`
+
+The pass-one stand-in. It exists so `kernel.stage1.elf` links at all.
+
+```cpp
+// kernel/lib/ksyms_stub.cpp — the stand-in table for the FIRST link.
+//
+// kernel.stage1.elf links this file. kernel.elf links the generated
+// build/kernel/generated/ksyms.cpp instead. Exactly one of the two is in any
+// given link, and they define the same five symbols in the same section.
+//
+// This file must define NOTHING else, and must emit no code: anything it put
+// into .text would appear in the stage-one link and not the final one, which
+// is precisely the drift Stage 1.7 §3 exists to prevent.
+
+#include <stdint.h>
+
+#define KSYMS __attribute__((used, section(".ksyms"), aligned(8)))
+
+extern "C" {
+
+KSYMS const uint32_t ksyms_count        = 0;
+KSYMS const uint32_t ksyms_strings_size = 1;
+KSYMS const uint64_t ksyms_addr[1]      = { 0 };
+KSYMS const uint32_t ksyms_name_off[1]  = { 0 };
+KSYMS const char     ksyms_strings[1]   = { '\0' };
+
+}  // extern "C"
+```
+
+`ksyms_count = 0` is the whole behaviour: `symbol_lookup` checks it first and returns "not
+found", so a stage-one image degrades exactly to Stage 0.7 — raw addresses, no names, no
+crash. That matters more than it sounds, because if you ever *do* boot the stage-one image by
+accident (see §7) you get a working kernel with an unhelpful backtrace rather than a mystery.
+
+The one-element arrays are not zero-length on purpose: `const uint64_t x[] = {};` is not valid
+C++, and a zero-length array extension would be a GNU extension in a tree that sets
+`CMAKE_CXX_EXTENSIONS OFF`. One element costs sixteen bytes in an image nobody boots.
+
+---
+
+### `kernel/CMakeLists.txt` — one compile, two links
+
+This is the restructure. The file from [[Stage 0.8 - The Build System]] built one executable
+directly from sources; it now builds an **object library** and links it twice.
+
+```cmake
+# --- the embedded font (Stage 1.2) -----------------------------------------
+set(FONT_BLOB ${CMAKE_SOURCE_DIR}/tools/mkfont/vga8x16.fnt)
+set(FONT_GEN  ${CMAKE_CURRENT_BINARY_DIR}/generated/font8x16.cpp)
+
+add_custom_command(
+    OUTPUT  ${FONT_GEN}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/generated
+    COMMAND ${MKFONT} ${FONT_BLOB} ${FONT_GEN} font8x16
+    DEPENDS ${FONT_BLOB} ${MKFONT} host_tools
+    COMMENT "mkfont: vga8x16.fnt -> font8x16.cpp"
+    VERBATIM
+)
+
+# --- every kernel translation unit, compiled ONCE --------------------------
+#
+# An object library, not two executables built from the same source list.
+# This is not only a build-time saving: it is what makes "the same objects,
+# linked twice" literally true, which is what the address-stability argument
+# in Stage 1.7 §3 rests on.
+
+add_library(kernel_objs OBJECT
+    arch/x86_64/boot/entry.cpp
+    arch/x86_64/boot/boot_info.cpp
+    drivers/char/serial.cpp
+    drivers/char/fbcon.cpp
+    lib/log.cpp
+    lib/panic.cpp
+    lib/symbols.cpp
+    main.cpp
+    ${FONT_GEN}
+)
+
+# PUBLIC, not PRIVATE: both executables below have one source of their own
+# (the stub / the generated table) and those must be compiled with exactly
+# the same flags. PUBLIC propagates them through target_link_libraries.
+target_compile_options(kernel_objs PUBLIC ${KERNEL_CXX_FLAGS})
+target_include_directories(kernel_objs PUBLIC ${CMAKE_SOURCE_DIR}/kernel/include)
+
+set(LD_SCRIPT ${CMAKE_SOURCE_DIR}/kernel/arch/x86_64/boot/linker.ld)
+set(KSYMS_GEN ${CMAKE_CURRENT_BINARY_DIR}/generated/ksyms.cpp)
+
+# --- pass 1: the same kernel, with an EMPTY symbol table -------------------
+add_executable(kernel.stage1.elf lib/ksyms_stub.cpp)
+target_link_libraries(kernel.stage1.elf PRIVATE kernel_objs)
+
+# --- generate: read pass 1's addresses, write pass 2's table ---------------
+add_custom_command(
+    OUTPUT  ${KSYMS_GEN}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/generated
+    COMMAND ${SYMBOLISE} $<TARGET_FILE:kernel.stage1.elf> ${KSYMS_GEN}
+            --nm x86_64-elf-nm
+    DEPENDS kernel.stage1.elf $<TARGET_FILE:kernel.stage1.elf>
+            ${SYMBOLISE} host_tools
+    COMMENT "symbolise: kernel.stage1.elf -> ksyms.cpp"
+    VERBATIM
+)
+
+# --- pass 2: the image that actually boots ---------------------------------
+add_executable(kernel.elf ${KSYMS_GEN})
+target_link_libraries(kernel.elf PRIVATE kernel_objs)
+
+# --- identical link treatment for both -------------------------------------
+foreach(image kernel.stage1.elf kernel.elf)
+    target_link_options(${image} PRIVATE ${KERNEL_LINK_FLAGS} -T ${LD_SCRIPT})
+    set_target_properties(${image} PROPERTIES
+        LINK_DEPENDS             ${LD_SCRIPT}
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+endforeach()
+
+# A separate symbol file: GDB loads it, and scripts/symbolise.sh can use it if
+# kernel.elf is ever stripped. Keep kernel.elf unstripped as well.
+add_custom_command(TARGET kernel.elf POST_BUILD
+    COMMAND x86_64-elf-objcopy --only-keep-debug
+            $<TARGET_FILE:kernel.elf> ${CMAKE_BINARY_DIR}/kernel.sym
+    COMMENT "Generating kernel.sym"
+)
+```
+
+#### Line by line
+
+**`add_library(kernel_objs OBJECT ...)`**
+An `OBJECT` library is a target that compiles sources and stops — no archive, no link. Both
+executables then consume the resulting `.o` files. Two things this buys, and the second is the
+important one. Compile time halves compared with listing the sources in both executables. And
+the two links are guaranteed to see **byte-identical objects**, which is the premise of the
+whole scheme: if the passes recompiled separately, a difference in flags, in `__FILE__`
+normalisation, or in anything else would move code between them and the table would be built
+against addresses the final image does not have.
+
+**`target_compile_options(kernel_objs PUBLIC ...)`**
+[[Stage 0.8 - The Build System]] used `PRIVATE` here, correctly, because there was one target
+and nothing consumed it. Now two executables link this library and each carries one source of
+its own — `ksyms_stub.cpp` and the generated `ksyms.cpp`. Those must be compiled with
+`-mcmodel=kernel -mno-red-zone -nostdinc++` like everything else, and `PUBLIC` is what
+propagates the flags across `target_link_libraries`. Leave it `PRIVATE` and the two extra
+sources compile with default host-ish flags: the most likely first symptom is
+`fatal error: stdint.h: No such file or directory`, and the least likely is a link that
+succeeds and is quietly wrong.
+
+**`target_link_libraries(kernel.stage1.elf PRIVATE kernel_objs)`**
+Since CMake 3.12 you may link an object library this way; the object files are added to the
+consuming target and the usage requirements propagate. This also creates the target-level
+dependency, so the objects are built before either link runs. The older
+`$<TARGET_OBJECTS:kernel_objs>` in the source list works too but does not propagate the
+compile options, which is exactly what we want here.
+
+**The custom command's `DEPENDS` line**
+
+| Entry | Kind | What it buys |
+|---|---|---|
+| `kernel.stage1.elf` | target | Ordering: the first link must finish before the tool runs |
+| `$<TARGET_FILE:kernel.stage1.elf>` | file | Re-run the generator whenever the stage-one image changes — i.e. whenever *any* kernel source changes |
+| `${SYMBOLISE}` | file | Edit `symbolise.cpp`, the tool relinks, its timestamp moves, the table regenerates |
+| `host_tools` | target | Ordering: build the tool before invoking it |
+
+The file entry is the one that makes the pipeline correct. Omit it and the table is generated
+once and never again: you add a function, the kernel rebuilds, the addresses shift, and the
+table still describes yesterday's binary — §2.6's failure, arriving by a different road.
+`${SYMBOLISE}` is accepted as a file dependency only because of `BUILD_BYPRODUCTS` in the
+top-level file; the two go together.
+
+**`--nm x86_64-elf-nm` passed explicitly**
+The tool's default is already this, but naming it in the build means the build does not depend
+on a default compiled into a binary somebody may change. It is also the line you edit on the
+day there is a second target architecture.
+
+**Why the custom command must live in this file**
+`add_custom_command(OUTPUT ...)` attaches to the directory it appears in, and only a target in
+*that same directory* picks it up. Move this block to the top-level `CMakeLists.txt` and
+`kernel.elf` never sees the rule; Ninja reports "no known rule to make ksyms.cpp" and the fix
+is not obvious from the message. Same rule as `mkfont` in Stage 1.2.
+
+**The `foreach`**
+Both images must be linked with the same flags and the same script, and both must land at the
+build root. Writing it once means they cannot drift — and drift here would be subtle, because
+a stage-one image linked with a *different* `max-page-size` would lay out `.text` differently
+and the table would be built against the wrong addresses. That is the failure this loop
+prevents from ever being possible.
+
+**`RUNTIME_OUTPUT_DIRECTORY` on the stage-one image too.** `scripts/mkimage.sh` only looks for
+`build/kernel.elf`, so the stage-one image does not need to be at the build root for the build
+to work. It is put there anyway so §6's verification command has a stable path.
+
+### `cmake/KernelFlags.cmake`
+
+One flag added:
+
+```cmake
+set(KERNEL_CXX_FLAGS
+    ...
+    -fno-omit-frame-pointer             # so panic() can walk the stack
+    -g                                  # DWARF, for the offline file:line pass
+    -Wall -Wextra -Werror)
+```
+
+CMake already adds `-g` for `Debug` and `RelWithDebInfo`. Adding it here makes it
+unconditional, and the reason is that half of this stage's deliverable lives on the host:
+`scripts/symbolise.sh` needs `.debug_line` in `kernel.elf`, and a plain `Release` build
+without this flag makes every `addr2line` answer `??:0`. The run-time cost is **zero** —
+`.debug_*` sections are not `SHF_ALLOC`, so they are in no `PT_LOAD` segment and Limine never
+reads them. The only cost is `kernel.elf` on the ISO getting a few megabytes larger, which
+matters to nobody at this stage and is recoverable later by stripping the *image* copy while
+keeping `build/kernel.sym`.
+
+---
+
+### `kernel/include/kernel/symbols.hpp`
+
+The cross-subsystem interface. One struct, two functions.
+
+```cpp
+#pragma once
+
+#include <stdint.h>
+
+// The result of resolving an address against the embedded symbol table.
+//
+//   name == nullptr  ->  the address resolved to nothing. Callers must check.
+//
+struct SymbolInfo {
+    const char* name;    // into .ksyms; NUL-terminated; never freed
+    uintptr_t   base;    // start address of the containing function
+    uintptr_t   offset;  // addr - base
+};
+
+// Resolve a kernel code address to "function + offset".
+//
+// Safe to call from panic(): never allocates, never locks, never writes, and
+// dereferences nothing it has not first bounds-checked. Runs in
+// ceil(log2(N)) + 1 iterations and cannot loop.
+SymbolInfo symbol_lookup(uintptr_t addr);
+
+// How many symbols this image embeds. 0 means no table (a stage-one link, or
+// one where --gc-sections ate .ksyms).
+uint32_t symbol_count();
+```
+
+`<stdint.h>`, not `<cstdint>` — there is no libstdc++ in this toolchain and `-nostdinc++`
+makes that a hard error rather than a surprise ([[ADR-0007 - Freestanding C++20 as the Kernel Language]]).
+
+`SymbolInfo` is returned by value and is 24 bytes, so the SysV ABI returns it via a hidden
+pointer to caller-provided storage. That storage is the caller's stack frame, which is the
+only allocation involved anywhere in this stage — and it is the same kind of "allocation" as
+declaring a local `int`.
+
+`symbol_count()` exists so the panic handler can print one honest line when the table is
+missing, rather than silently producing a Stage 0.7 backtrace and leaving you to wonder
+whether the stage is broken or the image is old.
+
+---
+
+### `kernel/lib/symbols.cpp`
+
+The lookup. Thirty lines, and this is the section to read twice.
+
+```cpp
+// kernel/lib/symbols.cpp — address -> "function+offset".
+//
+// Every rule from panic.cpp applies to this file, because panic.cpp is its
+// only caller and it runs after the kernel has admitted it is broken:
+//
+//   * never allocate            (there may be no heap; the heap may be corrupt)
+//   * never take a lock         (the lock may be the broken thing)
+//   * never parse               (the table is sorted at build time)
+//   * never write memory        (nothing here can corrupt anything)
+//   * never dereference an index that has not been bounds-checked
+//   * terminate, always, in a bounded number of steps
+
+#include <kernel/symbols.hpp>
+
+#include <stddef.h>
+#include <stdint.h>
+
+// Exported by the linker script (Stage 0.4). Declared as ARRAYS: the symbol's
+// ADDRESS is the value we want.
+extern "C" const char __text_start[];
+extern "C" const char __text_end[];
+
+// Emitted by tools/symbolise into .ksyms, or by lib/ksyms_stub.cpp when the
+// table is empty. See Stage 1.7 section 4 for the layout.
+extern "C" {
+extern const uint32_t ksyms_count;
+extern const uint32_t ksyms_strings_size;
+extern const uint64_t ksyms_addr[];
+extern const uint32_t ksyms_name_off[];
+extern const char     ksyms_strings[];
+}
+
+namespace {
+
+// No kernel function is this long. An address further than this past a symbol
+// start is inter-function padding or an unlisted region, not that function.
+constexpr uintptr_t MAX_SYMBOL_SPAN = 0x10000;   // 64 KiB
+
+static_assert(sizeof(uintptr_t) == sizeof(uint64_t),
+              "the table stores addresses as uint64_t");
+
+}  // namespace
+
+uint32_t symbol_count() {
+    return ksyms_count;
+}
+
+SymbolInfo symbol_lookup(uintptr_t addr) {
+    const SymbolInfo none{nullptr, 0, 0};
+
+    // 1. No table at all: a stage-one image, or .ksyms was garbage-collected.
+    const size_t n = ksyms_count;
+    if (n == 0)
+        return none;
+
+    // 2. Not kernel code. Rejects null, user addresses, non-canonical values,
+    //    data addresses, and anything in .ksyms itself.
+    const uintptr_t text_lo = reinterpret_cast<uintptr_t>(__text_start);
+    const uintptr_t text_hi = reinterpret_cast<uintptr_t>(__text_end);
+    if (addr < text_lo || addr >= text_hi)
+        return none;
+
+    // 3. Below the first symbol: there is no "greatest entry <= addr".
+    if (addr < ksyms_addr[0])
+        return none;
+
+    // 4. Binary search for the GREATEST index whose address is <= addr.
+    //    Invariant: every entry in [0, lo) is <= addr, every entry in
+    //    [hi, n) is > addr. The loop shrinks [lo, hi) by half each step, so
+    //    it runs at most ceil(log2(n)) + 1 times and cannot fail to end.
+    size_t lo = 0;
+    size_t hi = n;
+    while (lo < hi) {
+        const size_t mid = lo + (hi - lo) / 2;   // no overflow, ever
+        if (ksyms_addr[mid] <= addr)
+            lo = mid + 1;                        // mid qualifies; look right
+        else
+            hi = mid;                            // mid is too big; look left
+    }
+    // lo is now the COUNT of entries <= addr. Step 3 proved it is not zero.
+    const size_t idx = lo - 1;
+
+    const uintptr_t base   = static_cast<uintptr_t>(ksyms_addr[idx]);
+    const uintptr_t offset = addr - base;
+
+    // 5. The last symbol has no successor to bound it, and .text is padded to
+    //    a page. Refuse an implausible offset rather than print a name with a
+    //    five-digit offset that looks like an answer.
+    if (offset > MAX_SYMBOL_SPAN)
+        return none;
+
+    // 6. The table itself could be wrong. Bounds-check before indexing.
+    const uint32_t off = ksyms_name_off[idx];
+    if (off >= ksyms_strings_size)
+        return none;
+
+    return SymbolInfo{&ksyms_strings[off], base, offset};
+}
+```
+
+#### Line by line
+
+**The header comment**
+
+Not decoration. It is the review checklist for the file, and every rule in it is a rule whose
+violation converts "the kernel panicked and told me why" into "the kernel hung". Anyone adding
+a cache, a lock, a lazily-built index, or a `kprintf` call to this file must argue against the
+list first.
+
+**The linker symbols**
+```cpp
+extern "C" const char __text_start[];
+extern "C" const char __text_end[];
+```
+Declared as **arrays**, not pointers. `extern const char __text_start[]` means "the symbol's
+address is the value I want". Writing `extern const char* __text_start` reads eight bytes
+*from* that address and treats them as a pointer — a different and wrong number, and the
+symptom is that every lookup fails and every frame prints `<no symbol>`. Same declaration and
+same trap as [[Stage 0.7 - Panic and KASSERT]].
+
+**The table declarations**
+```cpp
+extern "C" {
+extern const uint32_t ksyms_count;
+extern const uint64_t ksyms_addr[];
+...
+}
+```
+`extern "C"` so the names match the unmangled definitions in the generated file, and the
+explicit `extern` keyword so these are declarations rather than tentative definitions with
+internal linkage. The arrays are declared with **no size**: this translation unit does not know
+how many entries there are and must not pretend to, because `ksyms_count` is the only truth.
+An incomplete array type is legal to declare and index; only `sizeof` is forbidden, which is
+exactly the operation that would be wrong here.
+
+**`MAX_SYMBOL_SPAN`**
+```cpp
+constexpr uintptr_t MAX_SYMBOL_SPAN = 0x10000;   // 64 KiB
+```
+The bound for step 5. Sixty-four kilobytes is roughly a hundred times the largest function this
+kernel will ever have and roughly sixteen times the page padding at the end of `.text`, so it
+rejects the case it exists for and accepts everything real. A tighter bound would eventually
+reject a genuinely large function; a looser one stops catching anything.
+
+**`static_assert`**
+```cpp
+static_assert(sizeof(uintptr_t) == sizeof(uint64_t), ...);
+```
+The table stores addresses as `uint64_t` and the lookup compares them against `uintptr_t`. On
+this target both are `unsigned long` so the comparison is exact and warning-free. On a 32-bit
+port it would silently truncate. One line, checked at compile time, and it turns a future
+silent bug into a build failure with a sentence explaining it.
+
+**Step 1 — the empty table**
+```cpp
+    const size_t n = ksyms_count;
+    if (n == 0)
+        return none;
+```
+First, because every step below indexes the array. Reading `ksyms_count` into a local also
+means the search compares against a value that cannot change under it — irrelevant today,
+relevant the moment [[Phase 12 - Overview|Phase 12]] has other cores running while this one
+panics.
+
+**Step 2 — the text-range gate**
+```cpp
+    if (addr < text_lo || addr >= text_hi)
+        return none;
+```
+This is doing four jobs at once and it is worth naming them. It rejects **null and user
+addresses**, because `__text_start` is `0xFFFFFFFF80000000`. It rejects every **non-canonical**
+address for free, since anything at or above the higher-half floor is canonical by
+construction. It rejects **data addresses**, including pointers into `.ksyms` itself. And it
+converts the last symbol's unbounded upper edge into a bounded one, which is what makes step 5
+a sanity check rather than the only defence.
+
+It is also the check that makes the *caller's* frame sanity test meaningful. `panic.cpp` asks
+"did this return address resolve?", and that question is only useful because a non-answer here
+means something specific: the address is not kernel code, or it is in a region no function
+covers.
+
+**Step 3 — below the first symbol**
+```cpp
+    if (addr < ksyms_addr[0])
+        return none;
+```
+The search below computes "how many entries are ≤ `addr`". If that count is zero there is no
+"greatest entry ≤ `addr`" and `lo - 1` would underflow to `SIZE_MAX`, and the next line would
+index the array at `SIZE_MAX`. Checking here rather than after the loop means the invalid case
+never reaches the arithmetic at all.
+
+Could this fire in practice? Only if `.text` begins with something `nm` did not report — a
+linker-inserted thunk, or a `.text` fragment from an object with no symbol. Rare, real, and
+cheap to handle.
+
+**Step 4 — the binary search, which is the whole file**
+
+This is the classic "greatest element ≤ target" search, and it is the classic place to get an
+off-by-one. Take it one line at a time.
+
+```cpp
+    size_t lo = 0;
+    size_t hi = n;
+```
+The search window is the **half-open** interval `[lo, hi)`: `lo` is included, `hi` is not.
+Half-open is what makes the arithmetic below work without any `+1`/`-1` corrections, and it is
+why `hi` starts at `n` rather than `n - 1`.
+
+The invariant, which is the thing to hold in your head:
+
+> every entry in `[0, lo)` is **≤ addr**, and every entry in `[hi, n)` is **> addr**.
+
+It is trivially true at the start, because both ranges are empty.
+
+```cpp
+        const size_t mid = lo + (hi - lo) / 2;
+```
+Not `(lo + hi) / 2`. That form overflows when `lo + hi` exceeds the range of the type — the bug
+that sat in `java.util.Arrays.binarySearch` for nine years. Our `n` is a few thousand, so it
+cannot happen here, and writing it the safe way anyway costs nothing and means the habit is
+there when the array is not small. `mid` is always in `[lo, hi)` because `hi > lo` in the loop.
+
+```cpp
+        if (ksyms_addr[mid] <= addr)
+            lo = mid + 1;
+        else
+            hi = mid;
+```
+**The predicate is `<=`, not `<`, and this is the off-by-one.** Think about what each branch
+asserts.
+
+If `ksyms_addr[mid] <= addr`, then entry `mid` *qualifies* — it is a candidate answer — and so
+does everything before it. So the invariant "everything in `[0, lo)` is ≤ addr" stays true if
+we set `lo = mid + 1`, moving `mid` into the qualified region. The answer is `mid` or something
+to its right.
+
+If `ksyms_addr[mid] > addr`, entry `mid` is disqualified and so is everything after it, so
+`hi = mid` keeps "everything in `[hi, n)` is > addr" true.
+
+Now change `<=` to `<` and follow it through. An address that is *exactly* a function's start —
+which is common: it is what `__builtin_return_address` gives you when a call is the first
+instruction of a function, and what every `+0x0` frame is — now takes the `else` branch, that
+entry lands in the disqualified region, and the search returns the *previous* function. The
+panic names `heap_free` when the frame is at the first byte of `heap_expand`. It is a real
+function, at a real address, with a plausible offset, and it is wrong.
+
+Note also `lo = mid + 1` versus `hi = mid`, which look asymmetric and are not: with a half-open
+window, excluding `mid` from the right-hand side means setting `hi` **to** `mid`, while
+excluding it from the left means setting `lo` **past** it. Write `hi = mid - 1` and the loop
+skips a candidate; write `lo = mid` and the window stops shrinking when `hi - lo == 1` and the
+loop never terminates — a hang inside `panic`, which is the one failure worse than a wrong
+answer.
+
+```cpp
+    const size_t idx = lo - 1;
+```
+When the loop ends, `lo == hi`, and by the invariant everything below `lo` qualifies while
+everything at or above it does not. So `lo` is exactly the **count** of entries ≤ `addr`, and
+the greatest qualifying entry is at `lo - 1`. Step 3 already proved `lo >= 1`, so this cannot
+underflow.
+
+**Why this terminates.** Each iteration strictly shrinks `hi - lo`: in the first branch `lo`
+increases to at least `mid + 1 > lo`; in the second `hi` drops to `mid < hi`. A strictly
+decreasing non-negative integer reaches zero, and `lo < hi` then fails. At most
+`⌈log₂ n⌉ + 1` iterations — twelve for four thousand symbols — with two array reads each.
+Termination is a property you can prove by reading eight lines, which is exactly the standard
+this file is held to.
+
+**Step 5 — bounding the offset**
+```cpp
+    if (offset > MAX_SYMBOL_SPAN)
+        return none;
+```
+For every entry except the last, the search has already bounded the offset: `addr` is less than
+`ksyms_addr[idx + 1]`, so the offset is at most the distance to the next function, which for a
+real function is its size. The last entry has no successor, and `.text` is padded to a page
+boundary after it, so an address in that padding would otherwise print as
+`last_function+0x3F40`.
+
+The number is a judgement, not a fact, and it is the right kind of judgement: it can only
+produce false *negatives* (a missing name for an enormous function), never a false positive.
+Given the choice, a panic that says `<no symbol>` is strictly better than one that says
+something wrong.
+
+A stricter alternative is to have the generator emit a sentinel entry at `__text_end` with an
+empty name, which gives every real symbol a successor and makes the bound exact. It is a good
+refinement and it costs the tool one special case; the constant is enough for now.
+
+**Step 6 — the bounds check before indexing the pool**
+```cpp
+    const uint32_t off = ksyms_name_off[idx];
+    if (off >= ksyms_strings_size)
+        return none;
+
+    return SymbolInfo{&ksyms_strings[off], base, offset};
+```
+The tool guarantees this can never fire. Check it anyway, and the reason is the same reason
+`panic` validates a frame pointer it has every reason to trust: **this code runs when the
+kernel is known to be broken.** Until [[Phase 4 - Overview|Phase 4]] maps `.ksyms` read-only,
+any wild write in the kernel can land in it. A corrupt offset without this check is a read at
+an arbitrary distance past the pool, followed by a walk to the next zero byte, in a function
+whose entire job is to not fault.
+
+This check is also what makes the returned pointer safe to hand to `put()`. `off <
+ksyms_strings_size` plus "the last byte of `ksyms_strings` is `'\0'`" together prove that a
+NUL exists at or before the end of the array, so walking to it stays in bounds. That pair of
+facts is why `panic.cpp` may call `put(sym.name)` — the one place in the panic path that
+dereferences a pointer it did not itself range-check, and it is safe because this function
+range-checked it here.
+
+**What this function does not do, and why that is the point.** No `malloc`, no static mutable
+state, no lock, no recursion, no loop whose bound depends on data, no write to memory, no read
+outside two arrays and two linker symbols. Every one of those absences is deliberate, because
+the caller is `panic`, and a fault inside `panic` costs you the original message and returns
+you to the silent reboot loop [[Stage 0.7 - Panic and KASSERT]] was written to eliminate.
+
+---
+
+### `kernel/lib/panic.cpp` — the updated backtrace
+
+Three changes: one include, one new helper, and a rewritten loop. Everything else in the file
+from [[Stage 0.7 - Panic and KASSERT]] is untouched, including the eight-step ordering — the
+backtrace is still step 5, still the first step that dereferences memory, and still placed
+after the register dump for exactly the reason §4 of that stage gives.
+
+```cpp
+#include <kernel/symbols.hpp>   // <-- add, next to <kernel/serial.hpp>
+```
+
+```cpp
+// --------------------------------------------------------------- backtrace -
+
+void print_frame(unsigned i, uintptr_t ret, const SymbolInfo& sym) {
+    put("  #");
+    if (i < 10)
+        put(" ", 1);                  // right-align #0..#9 with #10..#31
+    put_dec(i);
+    put("  0x");
+    put_hex(ret, 16);
+
+    if (sym.name != nullptr) {
+        put("  ");
+        put(sym.name);                // in bounds and NUL-terminated: see
+        put("+0x");                   // symbols.cpp step 6
+        put_hex_min(ret - sym.base);
+    } else {
+        put("  <no symbol>");
+    }
+    put("\n", 1);
+}
+
+void print_backtrace(const StackFrame* frame) {
+    put("\nBacktrace:\n");
+
+    if (symbol_count() == 0)
+        put("  (no symbol table in this image)\n");
+
+    for (unsigned i = 0; i < MAX_FRAMES; ++i) {
+        if (!frame_is_plausible(frame))
+            break;                              // validate BEFORE dereferencing
+
+        const uintptr_t   ret  = frame->ret;
+        const StackFrame* next = frame->next;
+
+        if (!text_is_plausible(ret))
+            break;
+
+        // ret is a RETURN address: the instruction AFTER the call. Resolve
+        // ret - 1 so a call in the last instruction of a function is
+        // attributed to that function and not to the next one. ret >=
+        // __text_start by the check above, so this cannot underflow.
+        const SymbolInfo sym = symbol_lookup(ret - 1);
+
+        print_frame(i, ret, sym);
+
+        // A return address inside no known function means the chain has left
+        // the rails. Print what we have and stop, rather than continuing to
+        // walk memory that has already proved untrustworthy.
+        if (sym.name == nullptr)
+            break;
+
+        if (reinterpret_cast<uintptr_t>(next) <= reinterpret_cast<uintptr_t>(frame))
+            break;                              // stacks grow down: must ascend
+        frame = next;
+    }
+}
+```
+
+#### Line by line
+
+**`if (symbol_count() == 0)`**
+One line that saves an hour. Without it, a build where `--gc-sections` ate `.ksyms`, or where
+you accidentally booted `kernel.stage1.elf`, produces a backtrace that looks exactly like the
+one Stage 0.7 produced — and you go looking for a bug in the binary search when the table is
+simply not there. This turns an absence into a statement.
+
+**`put_hex(ret, 16)` before the name**
+The raw address stays. Two reasons. `scripts/symbolise.sh` needs it to run `addr2line`, so
+dropping it would break the other half of the deliverable. And when the name is wrong — which
+is what §7's traps are about — the address is how you find out.
+
+**`put_hex_min(ret - sym.base)`**
+Minimum-width hex, so you get `+0x8C` and not `+0x000000000000008C`. Note the offset is
+computed from `ret`, while the *lookup* used `ret - 1`. That is deliberate and it is the only
+subtle line in the function: the name answers "which function was executing", and the offset
+answers "which byte do I paste into `addr2line`". Compute the offset from `ret - 1` instead
+and every number is one less than the address printed beside it, which is exactly the kind of
+inconsistency that costs twenty minutes at 2am.
+
+**`const SymbolInfo sym = symbol_lookup(ret - 1);` before `print_frame`**
+The lookup happens once, and its result is used for both printing and the sanity check. Calling
+it twice would be harmless — the function is pure — but doing the work once and holding the
+answer in a local is the same discipline as reading `frame->ret` and `frame->next` into locals:
+the panic path does each dangerous thing exactly once, in a place you can point at.
+
+**The frame sanity check**
+```cpp
+        if (sym.name == nullptr)
+            break;
+```
+This is what §3 promised, and it is one comparison on a value you already have. Before this
+stage the walk's only defences were structural — canonical, aligned, ascending, inside
+`.text`. Those accept any well-formed garbage that happens to point into the text range, and
+because the text range is a megabyte wide, garbage often does.
+
+The symbol table adds a semantic test: this address is not merely *in* the code region, it is
+inside a function the linker actually emitted. An address in inter-function padding, in a
+`.text` fragment that carries no symbol, or in a region past the last function fails it. Those
+are precisely the shapes a corrupted frame chain produces.
+
+Stopping rather than continuing is the right response, and the reasoning is the same as the
+ascending-address check next to it. A backtrace's value is that the frames are causally linked;
+once one link is unverifiable, the frames after it are not "slightly less reliable", they are
+unrelated. Printing them makes the output longer and less true. Printing the failing frame
+first, then stopping, keeps the address on screen so you can investigate it by hand — which is
+what you will want, because the most common cause is a hand-written assembly stub that built no
+frame, and the address tells you which one.
+
+**What has not changed, and why**
+The validate-before-dereference ordering, the `MAX_FRAMES` bound, the ascending-address check,
+and the placement of the whole walk after the register dump are all exactly as
+[[Stage 0.7 - Panic and KASSERT]] left them. Symbolisation is strictly additive: it reads a
+statically linked read-only array using an address the loop has already validated. It cannot
+make the walk less safe, and that property is the reason it can be added to the panic path at
+all.
+
+---
+
+### `scripts/symbolise.sh`
+
+The offline half: names come from the kernel, source lines come from here.
+
+```sh
+#!/usr/bin/env bash
+# scripts/symbolise.sh — add source locations to a panic log.
+#
+#   make run-serial | ./scripts/symbolise.sh
+#   ./scripts/symbolise.sh < build/serial.log
+#
+# Reads a log on stdin and, for every kernel address on a line, appends the
+# file:line that addr2line reports. Needs an UNSTRIPPED kernel.elf built with
+# -g — see cmake/KernelFlags.cmake.
+set -euo pipefail
+
+ELF="${KERNEL_ELF:-build/kernel.elf}"
+A2L="${ADDR2LINE:-x86_64-elf-addr2line}"
+
+[ -f "$ELF" ] || { echo "symbolise: no $ELF — run make first" >&2; exit 1; }
+
+while IFS= read -r line; do
+    addr=$(printf '%s\n' "$line" | grep -oiE '0xffffffff8[0-9a-f]{7}' | head -n1 || true)
+    if [ -n "$addr" ]; then
+        # Backtrace entries are RETURN addresses; -1 lands inside the call.
+        prev=$(printf '0x%x' "$(( addr - 1 ))")
+        loc=$("$A2L" -e "$ELF" "$prev" 2>/dev/null | head -n1 || true)
+        case "$loc" in
+            ''|'??:0'|'??:?') printf '%s\n'      "$line" ;;
+            *)                printf '%s   %s\n' "$line" "$loc" ;;
+        esac
+    else
+        printf '%s\n' "$line"
+    fi
+done
+```
+
+**The address pattern.** `0x` plus `ffffffff` plus `8` plus seven more hex digits is sixteen
+hex digits — the exact shape `put_hex(ret, 16)` emits, and it will not match a random hex
+number elsewhere in the log. `-i` because the kernel prints uppercase digits after a lowercase
+`0x`.
+
+**`$(( addr - 1 ))` and the sign.** `0xFFFFFFFF80104A2C` exceeds `INT64_MAX`, so bash's
+arithmetic wraps it to a negative value. That is harmless: `printf '%x'` reprints the same
+64-bit pattern, so `prev` comes out as `0xffffffff80104a2b` and `addr2line` gets the right
+number. The `-1` is the same rule §4 states, applied on the host.
+
+**The `case` on the result.** `addr2line` prints `??:0` when it has no line information for an
+address — a stub with no DWARF, or a build with no `-g`. Passing that through would add noise
+to every line; suppressing it means the script is safe to pipe every log through
+unconditionally.
+
+**If `kernel.elf` is ever stripped**, run it as `KERNEL_ELF=build/kernel.sym ./scripts/symbolise.sh`.
+`objcopy --only-keep-debug` keeps `.symtab` and every `.debug_*` section, which is everything
+`addr2line` needs.
+
+The obvious speed-up is to collect all the addresses and pass them to a single `addr2line`
+invocation, which accepts many. A panic has at most thirty-two frames, so the loop finishes
+instantly and the simple version is the one that stays readable.
+
+---
