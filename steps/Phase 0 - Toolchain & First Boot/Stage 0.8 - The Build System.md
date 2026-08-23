@@ -327,6 +327,7 @@ set(KERNEL_CXX_FLAGS
     -mno-red-zone                       # CRITICAL: interrupts clobber it
     -mno-sse -mno-mmx -mno-80387        # no FP state to save
     -fno-omit-frame-pointer             # so panic() can walk the stack
+    -g                                  # DWARF: addr2line, GDB, kernel.sym
     -Wall -Wextra -Werror)
 
 set(KERNEL_LINK_FLAGS
@@ -341,6 +342,16 @@ set(KERNEL_LINK_FLAGS
 **`-nostdinc++`** is the flag worth dwelling on, because it is the one that differs from most tutorials. Our toolchain image contains **no libstdc++** — `toolchain/Dockerfile` builds `all-gcc all-target-libgcc` and stops. Without `-nostdinc++`, an accidental `#include <cstdint>` produces a confusing "no such file" that people fix by adding a host include path, which then compiles against headers describing a completely different environment. With it, the failure is immediate and unambiguous. Use `<stdint.h>` and `kstd::` ([[ADR-0007 - Freestanding C++20 as the Kernel Language]]).
 
 **`-fno-omit-frame-pointer`** is here rather than only in the debug build because [[Stage 0.7 - Panic and KASSERT]]'s backtrace walks `rbp` as a frame-pointer chain. At `-O2` without this flag, GCC uses `rbp` as a general-purpose register and your backtrace prints plausible-looking fiction — which is worse than printing nothing.
+
+**`-g`** emits DWARF debug information. It costs **nothing at runtime**: the debug
+sections are not `PT_LOAD`, so they never occupy memory on the target — they only
+make `build/kernel.elf` larger on disk. Without it three things silently degrade:
+`x86_64-elf-addr2line` answers `??:0` instead of a file and line, `make gdb` has no
+source-level debugging, and the `kernel.sym` this stage generates via
+`objcopy --only-keep-debug` contains almost nothing worth keeping. Since
+[[Stage 0.7 - Panic and KASSERT]] and [[Stage 1.7 - Symbolised Backtraces]] both
+depend on turning an address back into a source line, this flag is load-bearing for
+every debugging session you will have.
 
 **`-Wl,-z,max-page-size=0x1000`** — see §7. This is the one whose absence produces a build that *works* and is quietly wrong.
 
