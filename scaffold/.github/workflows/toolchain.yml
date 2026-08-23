@@ -1,0 +1,78 @@
+name: Toolchain Image
+
+# Rebuilds and publishes the pinned build container.
+#
+# The repo pins this image BY DIGEST, not by tag. Updating the toolchain is
+# therefore an explicit PR that changes the pinned digest — visible in git log,
+# reviewable, revertable. See ADR-0005.
+
+on:
+  push:
+    branches: [master]
+    paths: ['toolchain/**', '.github/workflows/toolchain.yml']
+  pull_request:
+    paths: ['toolchain/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ${{ github.repository_owner }}/os-toolchain
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./toolchain
+          # Build for amd64 only. Apple Silicon runs it under emulation, which
+          # is slower but guarantees byte-identical output to CI — the whole
+          # point of ADR-0005. A native arm64 image would defeat that.
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: ${{ github.event_name == 'pull_request' }}
+
+      - name: Smoke test — can it actually build a kernel?
+        run: |
+          IMG="${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}"
+          [ "${{ github.event_name }}" = "pull_request" ] && IMG="${{ env.REGISTRY }}/${{ env.IMAGE }}:latest"
+          docker run --rm -v "${PWD}:/os" -w /os "$IMG" bash -c '
+            set -e
+            x86_64-elf-g++ --version | head -1
+            test -f "$LIMINE_DIR/BOOTX64.EFI"
+            # Prove the freestanding flags actually work together.
+            echo "extern \"C\" void kmain() {}" > /tmp/t.cpp
+            x86_64-elf-g++ -ffreestanding -fno-exceptions -fno-rtti \
+              -mno-red-zone -mno-sse -mno-mmx -mno-80387 -mcmodel=kernel \
+              -std=c++20 -c /tmp/t.cpp -o /tmp/t.o
+            echo "smoke test OK"
+          '
+
+      - name: Report the digest to pin
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "::notice::New toolchain digest: ${{ steps.build.outputs.digest }}"
+          echo "::notice::Update the container: lines in ci.yml, release.yml and nightly.yml to pin it."

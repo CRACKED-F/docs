@@ -4,17 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "fe13f7fe62a35c09",
+        "id": "adc9745fadd28f59",
         "type": "tabs",
         "children": [
           {
-            "id": "5424c0658b1bd848",
+            "id": "6663451e747711c0",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "Phase 0 - Toolchain & First Boot/Stage 0.1 - Prove Your Toolchain Works.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "Stage 0.1 - Prove Your Toolchain Works"
             }
           }
         ]
@@ -181,8 +185,24 @@
       "bases:Create new base": false
     }
   },
-  "active": "a7f837717b2687b8",
+  "active": "6663451e747711c0",
   "lastOpenFiles": [
+    "Phase 0 - Toolchain & First Boot/Phase 0 - Overview.md",
+    "Phase 1 - Text Output/Stage 1.6 - kprintf.md",
+    "Phase 1 - Text Output/Stage 1.2 - Rasterising a Bitmap Font.md",
+    "Phase 1 - Text Output/Stage 1.1 - The Linear Framebuffer.md",
+    "Phase 1 - Text Output/Phase 1 - Overview.md",
+    "Phase 0 - Toolchain & First Boot/Stage 0.2 - The Limine Request Section.md",
+    "Phase 0 - Toolchain & First Boot/Stage 0.1 - Prove Your Toolchain Works.md",
+    "Phase 1 - Text Output/Stage 1.1 - The VGA Text Buffer.md",
+    "Phase 0 - Toolchain & First Boot/Stage 0.4 - The Linker Script and Higher-Half Layout.md",
+    "Phase 1 - Text Output/Stage 1.2 - A Terminal Driver.md",
+    "Phase 11 - Modern Platform/Phase 11 - Overview.md",
+    "Phase 0 - Toolchain & First Boot/Stage 0.8 - The Build System.md",
+    "00 - Start Here.md",
+    "Phase 15 - Hardening and Real Hardware/Phase 15 - Overview.md",
+    "Phase 3 - Drivers Timer & Keyboard/Stage 3.1 - The Programmable Interval Timer.md",
+    "Phase 1 - Text Output/Stage 1.5 - kprintf, a Formatted Printer.md",
     "Capstone - You Built an OS.md",
     "Phase 8 - The Shell/Stage 8.4 - init - Wiring It Together.md",
     "Phase 8 - The Shell/Stage 8.3 - Launching Programs.md",
@@ -194,25 +214,9 @@
     "Phase 7 - Filesystem & Program Loading/Stage 7.3 - The Virtual Filesystem Layer.md",
     "Phase 7 - Filesystem & Program Loading/Stage 7.2 - A Read-Only Filesystem.md",
     "Phase 7 - Filesystem & Program Loading/Stage 7.1 - The Initial Ramdisk.md",
-    "Phase 7 - Filesystem & Program Loading/Phase 7 - Overview.md",
     "Phase 7 - Filesystem & Program Loading",
-    "Phase 6 - User Mode & System Calls/Stage 6.4 - A Minimal User C Library.md",
-    "Phase 6 - User Mode & System Calls/Stage 6.3 - The System Call Interface.md",
-    "Phase 6 - User Mode & System Calls/Stage 6.2 - Entering Ring 3.md",
-    "Phase 6 - User Mode & System Calls/Stage 6.1 - The Task State Segment.md",
-    "Phase 6 - User Mode & System Calls/Phase 6 - Overview.md",
     "Phase 6 - User Mode & System Calls",
-    "Phase 5 - Multitasking/Stage 5.4 - Sleep and Blocking.md",
-    "Phase 5 - Multitasking/Stage 5.3 - Preemptive Scheduling.md",
-    "Phase 5 - Multitasking/Stage 5.2 - Cooperative Task Switching.md",
-    "Phase 5 - Multitasking/Stage 5.1 - Tasks, Context, and the Stack.md",
-    "Phase 4 - Memory Management/Stage 4.4 - The Kernel Heap.md",
-    "Phase 5 - Multitasking/Phase 5 - Overview.md",
     "Phase 5 - Multitasking",
-    "Phase 4 - Memory Management/Stage 4.3 - Enabling Paging.md",
-    "Phase 4 - Memory Management/Stage 4.2 - The Physical Frame Allocator.md",
-    "Phase 4 - Memory Management/Stage 4.1 - Reading the Memory Map.md",
-    "Phase 4 - Memory Management/Phase 4 - Overview.md",
     "Phase 4 - Memory Management",
     "Phase 3 - Drivers Timer & Keyboard",
     "Phase 2 - CPU Tables & Interrupts",

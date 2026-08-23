@@ -1,0 +1,20 @@
+# --- Obsidian -------------------------------------------------------------
+# Per-user UI state: open tabs, pane layout, cursor positions. Changes on
+# every click and conflicts on every pull between two people. Shared config
+# (app.json, appearance.json, core-plugins.json, themes/) IS versioned, so
+# both of you get the same plugins and theme.
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+.obsidian/plugins/*/data.json
+
+# --- OS cruft -------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Editors --------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*~

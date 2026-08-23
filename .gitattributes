@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.md text eol=lf
+*.asm text eol=lf
+*.sh text eol=lf
+*.png binary
+*.iso binary
+*.img binary

@@ -1,0 +1,55 @@
+# Formatting is decided by this file, not by review comments.
+# `make fmt` applies it; CI enforces it. See steps/13 - Coding Standards.
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+ColumnLimit: 100
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+AccessModifierOffset: -4
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: Consecutive   # readable hardware register tables
+AlignConsecutiveDeclarations: false
+AlignConsecutiveMacros: Consecutive        # bit-flag constant blocks line up
+AlignEscapedNewlines: Left
+AlignTrailingComments: true
+
+AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: true    # syscall/exception dispatch tables
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never # an inlined `if` hides an early return
+AllowShortLoopsOnASingleLine: false
+
+AlwaysBreakTemplateDeclarations: Yes
+BinPackArguments: false
+BinPackParameters: false
+
+BreakBeforeBraces: Attach
+BreakConstructorInitializers: BeforeColon
+BreakStringLiterals: false                 # never split a panic message
+
+DerivePointerAlignment: false
+PointerAlignment: Left                     # `uint8_t* p`, not `uint8_t *p`
+
+IncludeBlocks: Regroup
+IncludeCategories:
+  - { Regex: '^"[^/]*\.hpp"',        Priority: 1 }   # own header
+  - { Regex: '^<kernel/',            Priority: 2 }   # kernel interfaces
+  - { Regex: '^<abi/',               Priority: 3 }   # the kernel/user ABI
+  - { Regex: '^<(cstdint|cstddef|type_traits|limits|utility|bit|concepts|atomic)>', Priority: 4 }
+  - { Regex: '.*',                   Priority: 5 }
+
+IndentCaseLabels: true
+IndentPPDirectives: AfterHash
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: None
+ReflowComments: true
+SeparateDefinitionBlocks: Always
+SortIncludes: CaseSensitive
+SpaceAfterCStyleCast: true
+SpacesBeforeTrailingComments: 2
+Standard: c++20

@@ -1,0 +1,140 @@
+
+name: CI
+
+# The merge gate. Staged so cheap checks fail fast — there is no point booting
+# a kernel that does not lint.
+#
+# Every job runs `make <target>` inside the same pinned container the team uses
+# locally. CI has no private build recipe: when it fails, you reproduce it with
+# one command. See steps/10 - CI Pipeline.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# NOTE: pin this to a digest, not a tag, before you rely on it:
+#   container: ghcr.io/cracked-f/os-toolchain@sha256:<digest>
+# The `env` context is NOT available in `jobs.<id>.container.image`, so the
+# reference is repeated per job rather than factored into a variable.
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Boundary + style enforcement. ~30s. Fails fast.
+  # -------------------------------------------------------------------------
+  lint:
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # scripts/lint.sh is the single source of truth for the format check and
+      # every architectural boundary rule. CI runs the exact script you run
+      # locally with `make lint`. Do NOT re-implement the rules here: the last
+      # time this file inlined them, the two copies drifted and the
+      # volatile-on-shared-state rule silently stopped being enforced in CI.
+      - name: Format check and architectural boundary rules
+        run: make lint
+
+      - name: clang-tidy
+        run: make lint-tidy
+
+  # -------------------------------------------------------------------------
+  # Build everything. ~2min.
+  # -------------------------------------------------------------------------
+  build:
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: /ccache
+          key: ccache-${{ runner.os }}-${{ hashFiles('**/*.cpp', '**/*.hpp', '**/*.asm') }}
+          restore-keys: ccache-${{ runner.os }}-
+
+      - run: make iso img
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: images
+          path: |
+            build/os.iso
+            build/os.img
+            build/kernel.elf
+            build/kernel.sym
+          retention-days: 14
+
+  # -------------------------------------------------------------------------
+  # Tier 1 — host unit tests. ~20s.
+  # -------------------------------------------------------------------------
+  test-unit:
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test-unit
+
+  # -------------------------------------------------------------------------
+  # Tier 2 — in-kernel self-tests under QEMU. ~2min.
+  # Reports via the isa-debug-exit device. ADR-0010.
+  # -------------------------------------------------------------------------
+  test-kernel:
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test-kernel
+      - name: Upload serial log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-kernel-logs
+          path: |
+            build/serial.log
+            build/qemu-stderr.log
+            build/kernel.elf
+
+  # -------------------------------------------------------------------------
+  # Tier 3 — integration boot tests across the boot matrix. ~3min.
+  # A bug that only appears under UEFI is exactly the bug that ruins a release.
+  # -------------------------------------------------------------------------
+  test-boot:
+    runs-on: ubuntu-latest
+    container: ghcr.io/cracked-f/os-toolchain:latest
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: bios-iso,  firmware: bios, media: iso, smp: 1 }
+          - { name: uefi-iso,  firmware: uefi, media: iso, smp: 1 }
+          - { name: uefi-img,  firmware: uefi, media: img, smp: 1 }
+          - { name: uefi-smp,  firmware: uefi, media: img, smp: 4 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: images
+          path: build/
+      - name: Boot test (${{ matrix.name }})
+        run: |
+          ./scripts/test.sh boot \
+            --firmware ${{ matrix.firmware }} \
+            --media    ${{ matrix.media }} \
+            --smp      ${{ matrix.smp }} \
+            --timeout  90
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-logs-${{ matrix.name }}
+          path: build/*.log

@@ -1,0 +1,39 @@
+# Default owners per subsystem. See steps/12 - Team Workflow.
+#
+# This is not exclusive ownership — either member may touch anything. It sets
+# the default reviewer, the person who holds the mental model for that area.
+#
+# Replace @member-a / @member-b with the real GitHub usernames.
+
+# Everything has a fallback owner.
+*                           @member-a @member-b
+
+# --- Member A: "Down" — hardware and memory -------------------------------
+/kernel/arch/               @member-a
+/kernel/mm/                 @member-a
+/kernel/drivers/            @member-a
+/boot/                      @member-a
+/toolchain/                 @member-a
+/cmake/                     @member-a
+
+# --- Member B: "Up" — processes, files, userspace -------------------------
+/kernel/fs/                 @member-b
+/kernel/syscall/            @member-b
+/kernel/sched/              @member-b
+/kernel/net/                @member-b
+/libc/                      @member-b
+/user/                      @member-b
+/tests/                     @member-b
+/.github/workflows/         @member-b
+/scripts/                   @member-b
+
+# --- Both, always ---------------------------------------------------------
+# The kernel/user ABI contract. A drift here is a syscall silently doing the
+# wrong thing, so both people look at every change. ADR-0008.
+/kernel/include/abi/        @member-a @member-b
+
+# Lock ordering is global. One person cannot safely change it alone.
+/kernel/sched/locks.md      @member-a @member-b
+
+# Decisions are joint by definition.
+/steps/decisions/           @member-a @member-b
