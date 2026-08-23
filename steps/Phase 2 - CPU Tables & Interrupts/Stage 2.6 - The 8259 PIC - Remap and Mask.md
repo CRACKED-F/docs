@@ -5,6 +5,13 @@
 
 ---
 
+> [!warning] SHALLOW NOTE — NOT YET REWRITTEN
+> This is the original short spec, kept so nothing is lost. It has **not** been
+> rewritten to the depth of [[Stage 2.2 - The TSS and Interrupt Stacks]] yet:
+> no tradeoff analysis, no line-by-line code walkthrough, and some of it still
+> carries 32-bit assumptions that do not hold in long mode. Treat it as an
+> outline, not instructions.
+
 ## Concept
 
 Hardware interrupts (keyboard, timer, disk) arrive through the **8259 PIC**. By

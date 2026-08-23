@@ -50,10 +50,12 @@ Detailed notes: [[Phase 1 - Overview]]
 Detailed notes: [[Phase 2 - Overview]]
 
 - [ ] 2.1 [[Stage 2.1 - The Global Descriptor Table]]
-- [ ] 2.2 [[Stage 2.2 - The Interrupt Descriptor Table]]
-- [ ] 2.3 [[Stage 2.3 - CPU Exception Handlers]]
-- [ ] 2.4 [[Stage 2.4 - Remapping the PIC]]
-- [ ] 2.5 [[Stage 2.5 - Hardware Interrupts (IRQs)]]
+- [ ] 2.2 [[Stage 2.2 - The TSS and Interrupt Stacks]] — survivable double faults
+- [ ] 2.3 [[Stage 2.3 - The Interrupt Descriptor Table]] — ⚠️ shallow, not yet rewritten
+- [ ] 2.4 [[Stage 2.4 - Interrupt Stubs and the Saved Frame]] — ⚠️ note not written yet
+- [ ] 2.5 [[Stage 2.5 - CPU Exception Handlers]] — ⚠️ shallow, not yet rewritten
+- [ ] 2.6 [[Stage 2.6 - The 8259 PIC - Remap and Mask]] — ⚠️ shallow, not yet rewritten
+- [ ] 2.7 [[Stage 2.7 - Hardware Interrupts]] — ⚠️ shallow, not yet rewritten
 
 ---
 
