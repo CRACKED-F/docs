@@ -32,12 +32,11 @@ Detailed notes: [[Phase 0 - Overview]]
 
 Detailed notes: [[Phase 1 - Overview]]
 
-> Rewritten for the linear framebuffer. Notes 1.3, 1.6 and 1.7 are still
-> outstanding — see the markers below.
+> Fully rewritten for the linear framebuffer. All seven notes complete.
 
 - [ ] 1.1 [[Stage 1.1 - The Linear Framebuffer]]
 - [ ] 1.2 [[Stage 1.2 - Rasterising a Bitmap Font]]
-- [ ] 1.3 [[Stage 1.3 - A Console - Cursor, Colour, Scrolling]] — ⚠️ note is an incomplete draft
+- [ ] 1.3 [[Stage 1.3 - A Console - Cursor, Colour, Scrolling]]
 - [ ] 1.4 [[Stage 1.4 - Double Buffering]]
 - [ ] 1.5 [[Stage 1.5 - The Log Ring Buffer and Levels]]
 - [ ] 1.6 [[Stage 1.6 - kprintf]]
