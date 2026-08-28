@@ -17,14 +17,18 @@
 That link opens it in your default browser straight from Obsidian. It is the
 fastest route, and the one to use day to day.
 
-> [!warning] If the link does nothing
-> Obsidian blocks `file://` links until you allow them: **Settings → Files and
-> links → Detect all file extensions** on, and confirm the security prompt the
-> first time you click. If it still refuses, use either fallback below — they
-> always work.
+> [!warning] First, make the file visible
+> Obsidian hides `.html` files by default because it cannot open them natively.
+> Turn on **Settings → Files and links → Show all file types**. Until you do,
+> `Kernel Map.html` will not appear in the file explorer at all.
+>
+> The `file://` link above may still be refused even then — Obsidian's security
+> model does not always allow launching local files from markdown, and no setting
+> changes that. Use the fallback below; it always works.
 
-**Fallback 1 — from the file explorer.** Right-click `Kernel Map.html` in
-Obsidian's sidebar and choose **Show in system explorer**, then double-click it.
+**Fallback 1 — from the file explorer (most reliable).** With *Show all file types*
+on, right-click `Kernel Map.html` in Obsidian's sidebar and choose
+**Show in system explorer**, then double-click it there.
 
 **Fallback 2 — from the browser.** Press `Ctrl+O` in any browser and pick:
 
