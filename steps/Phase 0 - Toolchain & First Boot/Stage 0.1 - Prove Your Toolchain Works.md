@@ -3,7 +3,7 @@
 **Difficulty:** Very Easy · ~20 minutes
 **Phase:** [[Phase 0 - Overview|Phase 0 — Toolchain & First Boot]]
 **Files you create:** none permanent — a throwaway `probe.cpp` you delete at the end
-**Deliverable:** the pinned container runs, `x86_64-elf-g++` produces a genuine `ELF 64-bit LSB relocatable, x86-64` object under the kernel flag set, and `qemu-system-x86_64` starts on the host — all three proven by inspection, not assumed.
+**Deliverable:** the pinned container runs, `x86_64-elf-g++` produces a genuine `ELF 64-bit LSB relocatable, x86-64` object under the kernel flag set, and `qemu-system-x86_64 ` starts on the host — all three proven by inspection, not assumed.
 
 ---
 

@@ -12,20 +12,36 @@
 
 ## Opening it
 
-The file is `Kernel Map.html`, in this folder.
+### ▶ [Click here to open the Kernel Map](file:///D:/CRACKED/steps/architecture/Kernel%20Map.html)
 
-**From Obsidian** — right-click it in the file explorer and choose
-**Show in system explorer**, then open it in any browser. Obsidian will not render
-it inline, because it is an interactive application rather than a document.
+That link opens it in your default browser straight from Obsidian. It is the
+fastest route, and the one to use day to day.
 
-**Directly** — double-click it in Explorer, or open your browser and press
-`Ctrl+O`, then pick:
+> [!warning] If the link does nothing
+> Obsidian blocks `file://` links until you allow them: **Settings → Files and
+> links → Detect all file extensions** on, and confirm the security prompt the
+> first time you click. If it still refuses, use either fallback below — they
+> always work.
+
+**Fallback 1 — from the file explorer.** Right-click `Kernel Map.html` in
+Obsidian's sidebar and choose **Show in system explorer**, then double-click it.
+
+**Fallback 2 — from the browser.** Press `Ctrl+O` in any browser and pick:
 
 ```
 D:\CRACKED\steps\architecture\Kernel Map.html
 ```
 
-**Pin it.** You will open this more often than any single note.
+Obsidian will not render the map *inside* a note. It is an interactive
+application — pan, zoom, click — not a document, and Obsidian's markdown view
+has no way to host that. Opening it in a browser is the intended route, not a
+workaround.
+
+**Pin the tab.** You will open this more often than any single note.
+
+> [!tip] On your teammate's Mac
+> Same file, different path. Use `Cmd+O` in the browser, or right-click →
+> **Show in system explorer** from Obsidian.
 
 > [!tip] It is genuinely offline
 > Everything is inline — no CDN, no framework, no build step. The only external

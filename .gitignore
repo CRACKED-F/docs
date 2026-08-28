@@ -3,10 +3,10 @@
 # every click and conflicts on every pull between two people. Shared config
 # (app.json, appearance.json, core-plugins.json, themes/) IS versioned, so
 # both of you get the same plugins and theme.
-.obsidian/workspace.json
-.obsidian/workspace-mobile.json
-.obsidian/cache
-.obsidian/plugins/*/data.json
+**/.obsidian/workspace.json
+**/.obsidian/workspace-mobile.json
+**/.obsidian/cache
+**/.obsidian/plugins/*/data.json
 
 # --- OS cruft -------------------------------------------------------------
 .DS_Store
