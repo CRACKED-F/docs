@@ -40,7 +40,7 @@ alongside the kernel material. An OS nobody can install is not an OS.
 
 ## The three decisions that shape everything
 
-Recorded in full under [[ADR-0001 - Record Architecture Decisions|steps/decisions]].
+Recorded in full under [[ADR-0001 - Record Architecture Decisions|steps for OS/decisions]].
 
 1. **x86_64, not 32-bit.** Modern firmware boots 64-bit executables. 32-bit is a
    dead end for anything meant to run on a real machine.

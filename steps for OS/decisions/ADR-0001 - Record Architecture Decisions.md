@@ -14,7 +14,7 @@ choice from an accident.
 ## Decision
 
 Record every significant technical decision as a numbered ADR in
-`steps/decisions/`. One decision per file. Never edit a decided ADR — supersede it
+`steps for OS/decisions/`. One decision per file. Never edit a decided ADR — supersede it
 with a new one that links back.
 
 An ADR is warranted when a choice is **expensive to reverse**, **constrains later

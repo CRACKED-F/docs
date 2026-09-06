@@ -437,7 +437,7 @@ The host generator. Reads the 4096-byte blob, writes a compilable C++ source fil
 //
 // usage: mkfont <input.fnt> <output.cpp> [symbol]
 //
-// See steps/Phase 1 - Text Output/Stage 1.2 - Rasterising a Bitmap Font.
+// See steps for OS/Phase 1 - Text Output/Stage 1.2 - Rasterising a Bitmap Font.
 
 #include <cstddef>
 #include <fstream>
@@ -744,7 +744,7 @@ A **separate project**, configured by a **separate CMake process**, built with t
 # every target in it is built by x86_64-elf-g++ for a machine with no OS. A tool
 # built there cannot run on the machine doing the building.
 #
-# See steps/08 - Build System, "Three toolchains, one tree", and Stage 0.8.
+# See steps for OS/08 - Build System, "Three toolchains, one tree", and Stage 0.8.
 
 cmake_minimum_required(VERSION 3.20)
 
@@ -896,7 +896,7 @@ The kernel-side declaration of the generated array, plus the one accessor everyt
 // Layout:  font8x16[glyph][scanline] is one row of 8 pixels.
 //          bit 0x80 = leftmost pixel   ...   bit 0x01 = rightmost pixel
 //
-// See steps/Phase 1 - Text Output/Stage 1.2 - Rasterising a Bitmap Font.
+// See steps for OS/Phase 1 - Text Output/Stage 1.2 - Rasterising a Bitmap Font.
 
 inline constexpr uint32_t FONT_WIDTH  = 8;
 inline constexpr uint32_t FONT_HEIGHT = 16;

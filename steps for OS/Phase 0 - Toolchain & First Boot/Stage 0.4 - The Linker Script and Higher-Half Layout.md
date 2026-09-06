@@ -378,7 +378,7 @@ The single file that decides where every byte of the kernel lives and what permi
 /* kernel/arch/x86_64/boot/linker.ld
  *
  * Higher-half kernel layout for x86_64 + Limine.
- * See: steps/06 - Architecture Overview  (memory layout)
+ * See: steps for OS/06 - Architecture Overview  (memory layout)
  *      steps/08 - Build System           (what this script must provide)
  *
  * MUST be linked with  -z max-page-size=0x1000

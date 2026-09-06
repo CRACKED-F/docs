@@ -12,7 +12,7 @@
 
 ## Opening it
 
-### ▶ [Click here to open the Kernel Map](file:///D:/CRACKED/steps/architecture/Kernel%20Map.html)
+### ▶ [Click here to open the Kernel Map](file:///D:/CRACKED/steps%20for%20OS/architecture/Kernel%20Map.html)
 
 That link opens it in your default browser straight from Obsidian. It is the
 fastest route, and the one to use day to day.
@@ -33,7 +33,7 @@ on, right-click `Kernel Map.html` in Obsidian's sidebar and choose
 **Fallback 2 — from the browser.** Press `Ctrl+O` in any browser and pick:
 
 ```
-D:\CRACKED\steps\architecture\Kernel Map.html
+D:\CRACKED\steps for OS\architecture\Kernel Map.html
 ```
 
 Obsidian will not render the map *inside* a note. It is an interactive

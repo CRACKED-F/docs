@@ -268,7 +268,7 @@ Tells CMake it is cross-compiling, and to which target.
 
 ```cmake
 # Cross-compilation toolchain: freestanding x86_64-elf kernel.
-# Read very early, before any compiler probing. See steps/08 - Build System.
+# Read very early, before any compiler probing. See steps for OS/08 - Build System.
 
 set(CMAKE_SYSTEM_NAME      Generic)
 set(CMAKE_SYSTEM_PROCESSOR x86_64)
@@ -315,7 +315,7 @@ Every flag, defined once. Nothing else in the tree may add or override a kernel 
 ```cmake
 # The kernel's compile and link flags. Defined ONCE, applied to every kernel
 # target. These are not stylistic — each prevents a specific, real failure.
-# See steps/08 - Build System and Stage 0.1 for the full reasoning.
+# See steps for OS/08 - Build System and Stage 0.1 for the full reasoning.
 
 set(KERNEL_CXX_FLAGS
     -ffreestanding                      # no hosted runtime assumptions
